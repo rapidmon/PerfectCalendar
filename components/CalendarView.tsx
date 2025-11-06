@@ -42,7 +42,7 @@ export default function CalendarView() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
+            <View style={styles.headerContainer} pointerEvents="box-none">
                 <TouchableOpacity 
                 style={styles.dropdownButton}
                 onPress={() => {
@@ -50,9 +50,8 @@ export default function CalendarView() {
                     setShowMonthDropdown(false);
                 }}
                 >
-                <Text style={styles.dropdownButtonText}>{currentYear}년</Text>
+                    <Text style={styles.dropdownButtonText}>{currentYear}년</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity 
                 style={styles.dropdownButton}
                 onPress={() => {
@@ -60,40 +59,37 @@ export default function CalendarView() {
                     setShowYearDropdown(false);
                 }}
                 >
-                <Text style={styles.dropdownButtonText}>{currentMonth}월</Text>
+                    <Text style={styles.dropdownButtonText}>{currentMonth}월</Text>
                 </TouchableOpacity>
             </View>
-
             <Dropdown
                 items={years}
                 selectedValue={currentYear}
                 onSelect={selectYear}
                 isVisible={showYearDropdown}
-                style={{ left: 20 }}
+                style={{ marginLeft: -80 }}
             />
-
             <Dropdown
                 items={months}
                 selectedValue={currentMonth}
                 onSelect={selectMonth}
                 isVisible={showMonthDropdown}
-                style={{ right: 20 }}
+                style={{ marginRight: -120 }}
             />
-
             <Calendar
-                key={formatDate(selectedDate)}
-                current={formatDate(selectedDate)}
-                markedDates={{
+            key={formatDate(selectedDate)}
+            current={formatDate(selectedDate)}
+            markedDates={{
                 [formatDate(today)]: { selected: true, selectedColor: '#4A90E2' }
-                }}
-                theme={{
+            }}
+            theme={{
                 todayTextColor: '#4A90E2',
                 arrowColor: '#4A90E2',
-                }}
-                hideArrows={false}
-                onMonthChange={(date) => {
+            }}
+            hideArrows={false}
+            onMonthChange={(date) => {
                 setSelectedDate(new Date(date.year, date.month - 1, 1));
-                }}
+            }}
             />
         </View>
     );
@@ -104,16 +100,22 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     headerContainer: {
+        position: 'absolute',
+        top: 0,
+        alignSelf: 'center',
+        backgroundColor: 'white',
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 10,
         gap: 10,
         marginBottom: 10,
-        zIndex: 1000,
+        zIndex: 20,
+        width: 250,
+        overflow: 'visible',
     },
     dropdownButton: {
-        paddingHorizontal: 5,
+        paddingHorizontal: 0,
         paddingVertical: 5,
     },
     dropdownButtonText: {
