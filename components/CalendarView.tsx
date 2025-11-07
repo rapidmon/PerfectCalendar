@@ -3,9 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import Dropdown from './Dropdown';
 
-export default function CalendarView() {
-    const today = new Date();
-    const [selectedDate, setSelectedDate] = useState(today);
+interface CalendarViewProps {
+    selectedDate: Date;
+    onDateChange: (date: Date) => void;
+}
+
+export default function CalendarView({ selectedDate, onDateChange }: CalendarViewProps) {
     const [showYearDropdown, setShowYearDropdown] = useState(false);
     const [showMonthDropdown, setShowMonthDropdown] = useState(false);
 
@@ -17,7 +20,7 @@ export default function CalendarView() {
     };
 
     // 연도 목록
-    const years = Array.from({ length: 100 }, (_, i) => today.getFullYear() - 50 + i).map(year => ({
+    const years = Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 50 + i).map(year => ({
         value: year,
         label: `${year}년`
     }));
@@ -30,13 +33,13 @@ export default function CalendarView() {
 
     const selectYear = (year: number) => {
         const newDate = new Date(year, currentMonth - 1, 1);
-        setSelectedDate(newDate);
+        onDateChange(newDate);
         setShowYearDropdown(false);
     };
 
     const selectMonth = (month: number) => {
         const newDate = new Date(currentYear, month - 1, 1);
-        setSelectedDate(newDate);
+        onDateChange(newDate);
         setShowMonthDropdown(false);
     };
 
@@ -67,28 +70,33 @@ export default function CalendarView() {
                 selectedValue={currentYear}
                 onSelect={selectYear}
                 isVisible={showYearDropdown}
-                style={{ marginLeft: -80 }}
+                style={{ marginLeft: '-30%' }}
             />
             <Dropdown
                 items={months}
                 selectedValue={currentMonth}
                 onSelect={selectMonth}
                 isVisible={showMonthDropdown}
-                style={{ marginRight: -120 }}
+                style={{ marginRight: '-40%' }}
             />
             <Calendar
             key={formatDate(selectedDate)}
             current={formatDate(selectedDate)}
             markedDates={{
-                [formatDate(today)]: { selected: true, selectedColor: '#4A90E2' }
+                [formatDate(selectedDate)]: { selected: true, selectedColor: '#4A90E2' }
             }}
             theme={{
-                todayTextColor: '#4A90E2',
-                arrowColor: '#4A90E2',
+                todayTextColor: '#8400ff',
+                arrowColor: '#8400ff',
             }}
             hideArrows={false}
+            onDayPress={(day) => {
+                // 날짜 클릭 시 실행
+                const newDate = new Date(day.year, day.month - 1, day.day);
+                onDateChange(newDate);
+            }}
             onMonthChange={(date) => {
-                setSelectedDate(new Date(date.year, date.month - 1, 1));
+                onDateChange(new Date(date.year, date.month - 1, 1));
             }}
             />
         </View>

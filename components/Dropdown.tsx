@@ -26,10 +26,9 @@ export default function Dropdown({ items, selectedValue, onSelect, isVisible, st
         const visibleHeight = 250;
         const offset = (selectedIndex * itemHeight) - (visibleHeight / 2) + (itemHeight / 2);
         
-        // 즉시 스크롤 (animated: false, setTimeout 제거)
         scrollViewRef.current?.scrollTo({
             y: Math.max(0, offset),
-            animated: false  // true → false
+            animated: false
         });
         }
     }
