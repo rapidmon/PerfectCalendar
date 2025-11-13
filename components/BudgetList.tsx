@@ -14,18 +14,21 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
                 id: '1',
                 title: '운동하기',
                 money: -12000,
+                date: '2025-11-10',
                 type: 'EXPENSE'
             },
             {
                 id: '2',
                 title: '월급',
                 money: 3000000,
+                date: '2025-11-10',
                 type: 'INCOME'
             },
             {
                 id: '3',
                 title: '콘서트 티켓 예매',
                 money: -4500,
+                date: '2025-11-10',
                 type: 'EXPENSE'
             },
         ]);
@@ -40,6 +43,16 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
         ));
     };
 
+    const filteredBudgets = budgets.filter(budget => {
+        const budgetDate = new Date(budget.date);
+        budgetDate.setHours(0, 0, 0, 0);
+        
+        const selected = new Date(selectedDate);
+        selected.setHours(0, 0, 0, 0);
+        
+        return budgetDate.getTime() === selected.getTime();
+    });
+
     return (
         <View style={styles.container}>
         <View style={styles.header}>
@@ -50,12 +63,16 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
         </View>
 
         <ScrollView style={styles.scrollView}>
-            {budgets.map(budget => (
-                <BudgetItem 
+            {filteredBudgets.length > 0 ? (
+                filteredBudgets.map(budget => (
+                    <BudgetItem 
                     key={budget.id}
                     budget={budget}
-                />
-            ))}
+                    />
+                ))
+                ) : (
+                <Text style={styles.emptyText}>-</Text>
+            )}
         </ScrollView>
         </View>
     );
@@ -96,5 +113,11 @@ const styles = StyleSheet.create({
     },
     scrollView: {
         flex: 1,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: '#999',
+        marginTop: 20,
+        fontSize: 14,
     },
 });

@@ -37,7 +37,7 @@ export default function TodoList({ selectedDate }: TodoListProps) {
             title: '영어 공부',
             type: 'RECURRING',
             recurringDay: '월',
-            completed: true,
+            completed: false,
         },
     ]);
 
@@ -52,23 +52,56 @@ export default function TodoList({ selectedDate }: TodoListProps) {
         ));
     };
 
+    const filteredTodos = todos.filter(todo => {
+        if (todo.type === 'RECURRING' && todo.recurringDay) {
+            const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()];
+            return dayOfWeek === todo.recurringDay;
+        }
+
+        if (todo.type === 'DEADLINE' && todo.deadline) {
+            const deadlineDate = new Date(todo.deadline);
+            deadlineDate.setHours(0, 0, 0, 0);
+            const selected = new Date(selectedDate);
+            selected.setHours(0, 0, 0, 0);
+            
+            return selected <= deadlineDate;
+        }
+
+        if (todo.type === 'SPECIFIC' && todo.specificDate) {
+            const specificDate = new Date(todo.specificDate);
+            specificDate.setHours(0, 0, 0, 0);
+            const selected = new Date(selectedDate);
+            selected.setHours(0, 0, 0, 0);
+            
+            return selected.getTime() === specificDate.getTime();
+        }
+
+        return false;
+    });
+
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>{formatDateKorean(selectedDate)} 할 일</Text>
-                <TouchableOpacity style={styles.addButton} onPress={handleAddTodo}>
-                    <Text style={styles.addButtonText}>+</Text>
-                </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {todos.map(todo => (
-                    <TodoItem 
-                        key={todo.id}
-                        todo={todo}
-                        onToggle={handleToggleTodo}
-                    />
-                ))}
-            </ScrollView>
+        <View style={styles.header}>
+            <Text style={styles.title}>{formatDateKorean(selectedDate)} 할 일</Text>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddTodo}>
+            <Text style={styles.addButtonText}>+</Text>
+            </TouchableOpacity>
+        </View>
+
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+            {filteredTodos.length > 0 ? (
+            filteredTodos.map(todo => (
+                <TodoItem 
+                key={todo.id}
+                todo={todo}
+                onToggle={handleToggleTodo}
+                selectedDate={selectedDate}
+                />
+            ))
+            ) : (
+            <Text style={styles.emptyText}>할 일이 없습니다</Text>
+            )}
+        </ScrollView>
         </View>
     );
 }
@@ -109,5 +142,11 @@ const styles = StyleSheet.create({
     },
     scrollView: {
         flex: 1,
+    },
+    emptyText: {
+        textAlign: 'center',
+        color: '#999',
+        marginTop: 20,
+        fontSize: 14,
     },
 });

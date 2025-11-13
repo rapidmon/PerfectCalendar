@@ -6,8 +6,7 @@ import BudgetList from './components/BudgetList';
 import { useState } from 'react';
 
 export default function App() {
-  const today = new Date();
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
   return (
     <View style={styles.container}>
@@ -45,8 +44,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   calendarSection: {
-    flex: 2,
-    marginBottom: 20,
+    flex: 1.7,
   },
   listSection: {
     flex: 1,

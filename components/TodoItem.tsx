@@ -5,9 +5,10 @@ import { Todo } from '../types/todo';
 interface TodoItemProps {
     todo: Todo;
     onToggle: (id: string) => void;
+    selectedDate: Date;
 }
 
-export default function TodoItem({ todo, onToggle }: TodoItemProps) {
+export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps) {
     const getDateText = () => {
         switch (todo.type) {
         case 'RECURRING':
@@ -15,27 +16,20 @@ export default function TodoItem({ todo, onToggle }: TodoItemProps) {
         
         case 'DEADLINE':
             if (todo.deadline) {
-            const today = new Date();
-            const deadlineDate = new Date(todo.deadline);
-            const diffTime = deadlineDate.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays < 0) {
-                return '기한 지남';
-            } else if (diffDays === 0) {
-                return '오늘까지!';
-            } else {
-                return `D-${diffDays}`;
-            }
+                const deadlineDate = new Date(todo.deadline);
+                const diffTime = deadlineDate.getTime() - selectedDate.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === 0) {
+                    return '오늘까지!';
+                } else {
+                    return `D-${diffDays}`;
+                }
             }
             return '';
         
         case 'SPECIFIC':
-            if (todo.specificDate) {
-            const date = new Date(todo.specificDate);
-            return `${date.getMonth() + 1}월 ${date.getDate()}일`;
-            }
-            return '';
+            return `오늘이다!`;
         
         default:
             return '';
@@ -44,14 +38,13 @@ export default function TodoItem({ todo, onToggle }: TodoItemProps) {
 
     const getDateColor = () => {
         if (todo.type === 'DEADLINE' && todo.deadline) {
-        const today = new Date();
-        const deadlineDate = new Date(todo.deadline);
-        const diffTime = deadlineDate.getTime() - today.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        if (diffDays < 0) return '#F44336'; // 빨강 (지남)
-        if (diffDays <= 3) return '#FF9800'; // 주황 (임박)
-        return '#4A90E2'; // 파랑 (여유)
+            const today = new Date();
+            const deadlineDate = new Date(todo.deadline);
+            const diffTime = deadlineDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays <= 3) return '#FF9800'; // 주황 (임박)
+            return '#4A90E2'; // 파랑 (여유)
         }
         return '#4A90E2';
     };
