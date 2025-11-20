@@ -10,7 +10,6 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Perfect Calendar</Text>
       <View style={styles.calendarSection}>
         <CalendarView 
           selectedDate={selectedDate}
@@ -35,13 +34,6 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 0,
-    color: '#333',
   },
   calendarSection: {
     flex: 1.7,

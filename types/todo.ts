@@ -1,4 +1,4 @@
-export type TodoType = 'RECURRING' | 'DEADLINE' | 'SPECIFIC';
+export type TodoType = 'RECURRING' | 'MONTHLY_RECURRING' | 'DEADLINE' | 'SPECIFIC';
 
 export interface Todo {
     id: string;
@@ -7,6 +7,7 @@ export interface Todo {
     completed: boolean;
     
     recurringDay?: string;
+    monthlyRecurringDay?: number;
 
     deadline?: string;
 

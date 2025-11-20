@@ -86,8 +86,8 @@ export default function CalendarView({ selectedDate, onDateChange }: CalendarVie
                 [formatDate(selectedDate)]: { selected: true, selectedColor: '#4A90E2' }
             }}
             theme={{
-                todayTextColor: '#8400ff',
-                arrowColor: '#8400ff',
+                todayTextColor: '#0f7dfa',
+                arrowColor: '#000000',
             }}
             hideArrows={false}
             onDayPress={(day) => {

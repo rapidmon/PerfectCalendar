@@ -13,7 +13,8 @@ export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps
         switch (todo.type) {
         case 'RECURRING':
             return `매주 ${todo.recurringDay}요일`;
-        
+        case 'MONTHLY_RECURRING':
+            return `매달 ${todo.monthlyRecurringDay}일`;
         case 'DEADLINE':
             if (todo.deadline) {
                 const deadlineDate = new Date(todo.deadline);
@@ -38,21 +39,17 @@ export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps
 
     const getDateColor = () => {
         if (todo.type === 'DEADLINE' && todo.deadline) {
-            const today = new Date();
             const deadlineDate = new Date(todo.deadline);
-            const diffTime = deadlineDate.getTime() - today.getTime();
+            const diffTime = deadlineDate.getTime() - selectedDate.getTime();
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays <= 3) return '#FF9800'; // 주황 (임박)
-            return '#4A90E2'; // 파랑 (여유)
+            if (diffDays <= 3) return '#FF9800';
+            return '#4A90E2';
         }
         return '#4A90E2';
     };
 
     return (
-        <View
-        style={styles.container}
-        >
+        <View style={styles.container}>
             <TouchableOpacity style={[styles.checkbox]} onPress={() => onToggle(todo.id)}>
                 {todo.completed && <Text style={styles.checkmark}></Text>}
             </TouchableOpacity>

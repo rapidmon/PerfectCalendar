@@ -31,6 +31,13 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
                 date: '2025-11-10',
                 type: 'EXPENSE'
             },
+            {
+                id: '4',
+                title: '사과, 감',
+                money: -6000,
+                date: '2025-11-10',
+                type: 'EXPENSE'
+            },
         ]);
 
     const handleAddBudget = () => {
