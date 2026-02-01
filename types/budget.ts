@@ -6,4 +6,14 @@ export interface Budget {
     money: number;
     date: string;
     type: BudgetType;
+    category: string;
+    account?: string;
+}
+
+export interface MonthlyGoal {
+    [yearMonth: string]: number;
+}
+
+export interface AccountBalances {
+    [accountName: string]: number;
 }

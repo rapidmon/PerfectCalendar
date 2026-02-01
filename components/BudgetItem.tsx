@@ -5,26 +5,30 @@ import { formatMoney } from '../utils/format';
 
 interface BudgetItemProps {
     budget: Budget;
+    onPress: () => void;
 }
 
-export default function BudgetItem({ budget }: BudgetItemProps) {
-
+export default function BudgetItem({ budget, onPress }: BudgetItemProps) {
     return (
         <TouchableOpacity
         style={styles.container}
+        onPress={onPress}
         >
-            <Text style={styles.title}>
-                {budget.title}
-            </Text>
+            <View style={styles.leftSection}>
+                <Text style={styles.title}>{budget.title}</Text>
+                {budget.category && budget.type === 'EXPENSE' ? (
+                    <Text style={styles.category}>{budget.category}</Text>
+                ) : null}
+            </View>
             <Text style={[
-            styles.money, 
+            styles.money,
             { color: budget.type === 'INCOME' ? '#4CAF50' : '#F44336' }
             ]}>
                 {formatMoney(budget.money)}
             </Text>
         </TouchableOpacity>
     );
-    }
+}
 
 const styles = StyleSheet.create({
     container: {
@@ -34,19 +38,20 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         borderRadius: 8,
         marginBottom: 6,
-        justifyContent: 'space-between'
+        justifyContent: 'space-between',
+    },
+    leftSection: {
+        flex: 1,
     },
     title: {
         fontSize: 14,
         color: '#333',
-        marginBottom: 4,
+    },
+    category: {
+        fontSize: 11,
+        color: '#999',
+        marginTop: 2,
     },
     money: {
-    },
-    income: {
-        color: '#4CAF50',
-    },
-    expense: {
-        color: '#F44336',
     },
 });

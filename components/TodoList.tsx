@@ -73,7 +73,7 @@ export default function TodoList({ selectedDate }: TodoListProps) {
     };
 
     const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date) => {
-        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false };
+        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: new Date().toISOString().split('T')[0] };
 
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];

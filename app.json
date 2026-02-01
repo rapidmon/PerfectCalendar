@@ -7,13 +7,18 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "scheme": "perfectcalendar",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.perfectcalendar.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +26,38 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.perfectcalendar.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "TodoWidget",
+              "label": "할 일 목록",
+              "minWidth": "320dp",
+              "minHeight": "200dp",
+              "maxResizeWidth": "400dp",
+              "maxResizeHeight": "600dp",
+              "description": "마감 할 일 목록과 진행바",
+              "resizeMode": "horizontal|vertical",
+              "targetCellWidth": 4,
+              "targetCellHeight": 3
+            }
+          ]
+        }
+      ],
+      "./plugins/withIOSWidget"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "5c1f0ac3-2960-449b-af4c-324c8c1a9fb0"
+      }
     }
   }
 }

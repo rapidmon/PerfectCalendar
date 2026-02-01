@@ -12,4 +12,6 @@ export interface Todo {
     deadline?: string;
 
     specificDate?: string;
+
+    createdAt?: string;
 }
