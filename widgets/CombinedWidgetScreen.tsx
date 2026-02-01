@@ -1,7 +1,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ListWidget } from 'react-native-android-widget';
 import { Todo } from '../types/todo';
-import { Budget } from '../types/budget';
+import { Budget, AccountBalances } from '../types/budget';
 import { calculateTodoProgress, BlockColor } from '../utils/todoProgress';
 
 export type WidgetTab = 'todo' | 'budget';
@@ -10,6 +10,8 @@ interface CombinedWidgetScreenProps {
     todos: Todo[];
     budgets: Budget[];
     activeTab: WidgetTab;
+    accounts: string[];
+    accountInitialBalances: AccountBalances;
 }
 
 // ── 할 일 콘텐츠 ──
@@ -209,14 +211,25 @@ function AccountCard({ name, balance }: { name: string; balance: number }) {
     );
 }
 
-function BudgetContent({ budgets }: { budgets: Budget[] }) {
-    const accountMap: Record<string, number> = {};
-    for (const b of budgets) {
-        const acc = b.account || '기본';
-        accountMap[acc] = (accountMap[acc] || 0) + b.money;
-    }
-
-    const accountEntries = Object.entries(accountMap);
+function BudgetContent({ budgets, accounts, accountInitialBalances }: {
+    budgets: Budget[];
+    accounts: string[];
+    accountInitialBalances: AccountBalances;
+}) {
+    // 앱과 동일한 방식으로 통장별 잔액 계산
+    const accountEntries = accounts.map(account => {
+        const initial = accountInitialBalances[account] || 0;
+        let balance = initial;
+        for (const b of budgets) {
+            if ((b.account || '기본') !== account) continue;
+            if (b.type === 'INCOME') {
+                balance += Math.abs(b.money);
+            } else {
+                balance -= Math.abs(b.money);
+            }
+        }
+        return { name: account, balance };
+    });
 
     return (
         <FlexWidget
@@ -237,16 +250,18 @@ function BudgetContent({ budgets }: { budgets: Budget[] }) {
             />
 
             {accountEntries.length === 0 ? (
-                <TextWidget
-                    text="등록된 내역이 없습니다"
-                    style={{ fontSize: 13, color: '#999999' }}
-                />
+                <FlexWidget style={{ flex: 1, justifyContent: 'center', alignItems: 'center', width: 'match_parent' }}>
+                    <TextWidget
+                        text="등록된 통장이 없습니다"
+                        style={{ fontSize: 13, color: '#999999' }}
+                    />
+                </FlexWidget>
             ) : (
-                <ListWidget style={{ width: 'match_parent', height: 'match_parent' }}>
-                    {accountEntries.map(([name, balance]) => (
-                        <AccountCard key={name} name={name} balance={balance} />
+                <FlexWidget style={{ flex: 1, width: 'match_parent' }}>
+                    {accountEntries.map(item => (
+                        <AccountCard key={item.name} name={item.name} balance={item.balance} />
                     ))}
-                </ListWidget>
+                </FlexWidget>
             )}
 
             <FlexWidget
@@ -269,7 +284,7 @@ function BudgetContent({ budgets }: { budgets: Budget[] }) {
 
 // ── 통합 위젯 ──
 
-export default function CombinedWidgetScreen({ todos, budgets, activeTab }: CombinedWidgetScreenProps) {
+export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, accountInitialBalances }: CombinedWidgetScreenProps) {
     return (
         <FlexWidget
             style={{
@@ -337,7 +352,7 @@ export default function CombinedWidgetScreen({ todos, budgets, activeTab }: Comb
             {/* 콘텐츠 */}
             {activeTab === 'todo'
                 ? <TodoContent todos={todos} />
-                : <BudgetContent budgets={budgets} />
+                : <BudgetContent budgets={budgets} accounts={accounts} accountInitialBalances={accountInitialBalances} />
             }
         </FlexWidget>
     );

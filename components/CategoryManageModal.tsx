@@ -4,25 +4,33 @@ import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
 interface CategoryManageModalProps {
     visible: boolean;
     categories: string[];
+    fixedCategories: string[];
     onClose: () => void;
-    onSave: (categories: string[]) => void;
+    onSave: (categories: string[], fixedCategories: string[]) => void;
 }
 
 export default function CategoryManageModal({
     visible,
     categories,
+    fixedCategories,
     onClose,
     onSave,
 }: CategoryManageModalProps) {
     const [list, setList] = useState<string[]>([]);
+    const [fixedList, setFixedList] = useState<string[]>([]);
     const [newCategory, setNewCategory] = useState('');
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editingName, setEditingName] = useState('');
 
     useEffect(() => {
         if (visible) {
             setList([...categories]);
+            setFixedList([...fixedCategories]);
             setNewCategory('');
+            setEditingIndex(null);
+            setEditingName('');
         }
-    }, [visible, categories]);
+    }, [visible, categories, fixedCategories]);
 
     const handleAdd = () => {
         const trimmed = newCategory.trim();
@@ -37,10 +45,54 @@ export default function CategoryManageModal({
 
     const handleDelete = (cat: string) => {
         setList(prev => prev.filter(c => c !== cat));
+        setFixedList(prev => prev.filter(c => c !== cat));
+    };
+
+    const toggleFixed = (cat: string) => {
+        setFixedList(prev =>
+            prev.includes(cat)
+                ? prev.filter(c => c !== cat)
+                : [...prev, cat]
+        );
+    };
+
+    const startEdit = (index: number) => {
+        setEditingIndex(index);
+        setEditingName(list[index]);
+    };
+
+    const confirmEdit = () => {
+        if (editingIndex === null) return;
+        const trimmed = editingName.trim();
+        const oldName = list[editingIndex];
+
+        if (!trimmed) {
+            Alert.alert('알림', '카테고리 이름을 입력해 주세요.');
+            return;
+        }
+        if (trimmed !== oldName && list.includes(trimmed)) {
+            Alert.alert('알림', '이미 존재하는 카테고리입니다.');
+            return;
+        }
+
+        if (trimmed !== oldName) {
+            setList(prev => prev.map((c, i) => i === editingIndex ? trimmed : c));
+            // 고정지출 목록에서도 이름 변경
+            if (fixedList.includes(oldName)) {
+                setFixedList(prev => prev.map(c => c === oldName ? trimmed : c));
+            }
+        }
+        setEditingIndex(null);
+        setEditingName('');
+    };
+
+    const cancelEdit = () => {
+        setEditingIndex(null);
+        setEditingName('');
     };
 
     const handleSave = () => {
-        onSave(list);
+        onSave(list, fixedList);
         onClose();
     };
 
@@ -64,14 +116,47 @@ export default function CategoryManageModal({
                     </View>
 
                     <ScrollView style={styles.list}>
-                        {list.map(cat => (
-                            <View key={cat} style={styles.itemRow}>
-                                <Text style={styles.itemText}>{cat}</Text>
-                                <TouchableOpacity onPress={() => handleDelete(cat)}>
-                                    <Text style={styles.deleteText}>삭제</Text>
-                                </TouchableOpacity>
-                            </View>
-                        ))}
+                        {list.map((cat, index) => {
+                            const isFixed = fixedList.includes(cat);
+                            return (
+                                <View key={`${index}-${cat}`} style={styles.itemRow}>
+                                    {editingIndex === index ? (
+                                        <View style={styles.editRow}>
+                                            <TextInput
+                                                style={styles.editInput}
+                                                value={editingName}
+                                                onChangeText={setEditingName}
+                                                onSubmitEditing={confirmEdit}
+                                                autoFocus
+                                            />
+                                            <TouchableOpacity onPress={confirmEdit} style={styles.editActionBtn}>
+                                                <Text style={styles.confirmText}>확인</Text>
+                                            </TouchableOpacity>
+                                            <TouchableOpacity onPress={cancelEdit} style={styles.editActionBtn}>
+                                                <Text style={styles.cancelEditText}>취소</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ) : (
+                                        <TouchableOpacity onPress={() => startEdit(index)} style={styles.itemNameBtn}>
+                                            <Text style={styles.itemText}>{cat} ✎</Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    <View style={styles.itemActions}>
+                                        <TouchableOpacity
+                                            style={[styles.fixedBtn, isFixed && styles.fixedBtnActive]}
+                                            onPress={() => toggleFixed(cat)}
+                                        >
+                                            <Text style={[styles.fixedBtnText, isFixed && styles.fixedBtnTextActive]}>
+                                                고정지출
+                                            </Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => handleDelete(cat)}>
+                                            <Text style={styles.deleteText}>삭제</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            );
+                        })}
                         {list.length === 0 && (
                             <Text style={styles.emptyText}>카테고리가 없습니다</Text>
                         )}
@@ -104,7 +189,7 @@ const styles = StyleSheet.create({
         padding: 24,
         width: '85%',
         maxWidth: 400,
-        maxHeight: '70%',
+        maxHeight: '75%',
     },
     modalTitle: {
         fontSize: 18,
@@ -138,7 +223,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     list: {
-        maxHeight: 250,
+        maxHeight: 300,
         marginBottom: 16,
     },
     itemRow: {
@@ -150,9 +235,63 @@ const styles = StyleSheet.create({
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
     },
+    itemNameBtn: {
+        flex: 1,
+    },
     itemText: {
         fontSize: 15,
         color: '#333',
+    },
+    editRow: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginRight: 8,
+    },
+    editInput: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#4A90E2',
+        borderRadius: 6,
+        padding: 6,
+        fontSize: 15,
+    },
+    editActionBtn: {
+        padding: 4,
+    },
+    confirmText: {
+        fontSize: 13,
+        color: '#4A90E2',
+        fontWeight: '600',
+    },
+    cancelEditText: {
+        fontSize: 13,
+        color: '#999',
+    },
+    itemActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    fixedBtn: {
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+    },
+    fixedBtnActive: {
+        backgroundColor: '#FF9800',
+        borderColor: '#FF9800',
+    },
+    fixedBtnText: {
+        fontSize: 11,
+        color: '#999',
+        fontWeight: '600',
+    },
+    fixedBtnTextActive: {
+        color: '#fff',
     },
     deleteText: {
         fontSize: 13,

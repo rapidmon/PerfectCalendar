@@ -32,11 +32,13 @@ export default function App() {
                 onDateChange={setSelectedDate}
               />
             </View>
-            <View style={styles.listSection}>
-              <TodoList selectedDate={selectedDate} />
-            </View>
-            <View style={styles.listSection}>
-              <BudgetList selectedDate={selectedDate} />
+            <View style={styles.listsContainer}>
+              <View style={styles.listSection}>
+                <TodoList selectedDate={selectedDate} />
+              </View>
+              <View style={styles.listSection}>
+                <BudgetList selectedDate={selectedDate} />
+              </View>
             </View>
           </>
         );
@@ -123,7 +125,12 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   calendarSection: {
-    flex: 1.7,
+    zIndex: 10,
+  },
+  listsContainer: {
+    flex: 1,
+    gap: 8,
+    marginTop: 4,
   },
   listSection: {
     flex: 1,

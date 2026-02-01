@@ -65,6 +65,14 @@ export function computeMonthlyStats(
         }))
         .sort((a, b) => b.amount - a.amount);
 
+    // 총 지출에서 저축 제외
+    totalExpense -= totalSavings;
+
+    const categoryBreakdownExcludingSavings = categoryBreakdown.map(item => ({
+        ...item,
+        ratio: totalExpense > 0 ? (item.amount / totalExpense) * 100 : 0,
+    })).filter(item => item.category !== '저축');
+
     const incomeExpenseRatio = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : 0;
 
     return {
@@ -73,7 +81,7 @@ export function computeMonthlyStats(
         totalSavings,
         totalFixedExpense,
         incomeExpenseRatio,
-        categoryBreakdown,
+        categoryBreakdown: categoryBreakdownExcludingSavings,
     };
 }
 

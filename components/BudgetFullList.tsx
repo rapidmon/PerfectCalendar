@@ -3,9 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator
 import MonthlySummaryCard from './MonthlySummaryCard';
 import MonthlyChartCard from './MonthlyChartCard';
 import SetGoalModal from './SetGoalModal';
-import FixedExpenseCategoryModal from './FixedExpenseCategoryModal';
 import CategoryManageModal from './CategoryManageModal';
-import AccountBalanceModal from './AccountBalanceModal';
 import AccountManageModal from './AccountManageModal';
 import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
 import {
@@ -41,9 +39,7 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
 
     const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
     const [goalModalVisible, setGoalModalVisible] = useState(false);
-    const [fixedModalVisible, setFixedModalVisible] = useState(false);
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
-    const [accountBalanceModalVisible, setAccountBalanceModalVisible] = useState(false);
     const [accountManageModalVisible, setAccountManageModalVisible] = useState(false);
 
     useEffect(() => {
@@ -67,10 +63,18 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         load();
     }, []);
 
-    // Reload budgets when coming back (selectedDate changes may mean new data)
+    // Reload data when coming back (selectedDate changes may mean new data)
     useEffect(() => {
         if (!loading) {
-            loadBudgets().then(setBudgets);
+            Promise.all([
+                loadBudgets(),
+                loadAccounts(),
+                loadAccountBalances(),
+            ]).then(([b, acc, ab]) => {
+                setBudgets(b);
+                setAccounts(acc);
+                setAccountInitialBalances(ab);
+            });
         }
     }, [selectedDate, loading]);
 
@@ -101,33 +105,25 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         saveMonthlyGoals(updated);
     }, [monthlyGoals, monthKey]);
 
-    const handleSaveFixedCategories = useCallback((cats: string[]) => {
-        setFixedCategories(cats);
-        saveFixedExpenseCategories(cats);
-    }, []);
-
-    const handleSaveCategories = useCallback((cats: string[]) => {
+    const handleSaveCategories = useCallback((cats: string[], fixed: string[]) => {
         setCategories(cats);
         saveCategories(cats);
+        setFixedCategories(fixed);
+        saveFixedExpenseCategories(fixed);
     }, []);
 
-    const handleSaveAccountBalances = useCallback((balances: AccountBalances) => {
+    const handleSaveAccounts = useCallback((accs: string[], balances: AccountBalances) => {
+        setAccounts(accs);
+        saveAccounts(accs);
         setAccountInitialBalances(balances);
         saveAccountBalances(balances);
     }, []);
 
-    const handleSaveAccounts = useCallback((accs: string[]) => {
-        setAccounts(accs);
-        saveAccounts(accs);
-    }, []);
-
-    const openSettingsItem = (target: 'goal' | 'category' | 'fixed' | 'accountBalance' | 'accountManage') => {
+    const openSettingsItem = (target: 'goal' | 'category' | 'accountManage') => {
         setSettingsMenuVisible(false);
         setTimeout(() => {
             if (target === 'goal') setGoalModalVisible(true);
             else if (target === 'category') setCategoryModalVisible(true);
-            else if (target === 'fixed') setFixedModalVisible(true);
-            else if (target === 'accountBalance') setAccountBalanceModalVisible(true);
             else if (target === 'accountManage') setAccountManageModalVisible(true);
         }, 200);
     };
@@ -188,32 +184,18 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 onSave={handleSaveGoal}
             />
 
-            <FixedExpenseCategoryModal
-                visible={fixedModalVisible}
-                categories={categories}
-                fixedCategories={fixedCategories}
-                onClose={() => setFixedModalVisible(false)}
-                onSave={handleSaveFixedCategories}
-            />
-
             <CategoryManageModal
                 visible={categoryModalVisible}
                 categories={categories}
+                fixedCategories={fixedCategories}
                 onClose={() => setCategoryModalVisible(false)}
                 onSave={handleSaveCategories}
-            />
-
-            <AccountBalanceModal
-                visible={accountBalanceModalVisible}
-                accounts={accounts}
-                initialBalances={accountInitialBalances}
-                onClose={() => setAccountBalanceModalVisible(false)}
-                onSave={handleSaveAccountBalances}
             />
 
             <AccountManageModal
                 visible={accountManageModalVisible}
                 accounts={accounts}
+                initialBalances={accountInitialBalances}
                 onClose={() => setAccountManageModalVisible(false)}
                 onSave={handleSaveAccounts}
             />
@@ -247,23 +229,9 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                         <View style={styles.menuDivider} />
                         <TouchableOpacity
                             style={styles.menuItem}
-                            onPress={() => openSettingsItem('fixed')}
-                        >
-                            <Text style={styles.menuItemText}>고정지출 카테고리 설정</Text>
-                        </TouchableOpacity>
-                        <View style={styles.menuDivider} />
-                        <TouchableOpacity
-                            style={styles.menuItem}
                             onPress={() => openSettingsItem('accountManage')}
                         >
                             <Text style={styles.menuItemText}>통장 관리</Text>
-                        </TouchableOpacity>
-                        <View style={styles.menuDivider} />
-                        <TouchableOpacity
-                            style={styles.menuItem}
-                            onPress={() => openSettingsItem('accountBalance')}
-                        >
-                            <Text style={styles.menuItemText}>통장 초기 잔액 설정</Text>
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
