@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { BarChart } from 'react-native-gifted-charts';
+import { WebView } from 'react-native-webview';
 import { ChartMonthData } from '../utils/budgetAnalytics';
 
 interface MonthlyChartCardProps {
@@ -16,47 +16,161 @@ export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
         );
     }
 
-    const maxValue = Math.max(
-        ...chartData.map(d => Math.max(d.income, d.totalExpense)),
-        1,
-    );
+    const htmlContent = useMemo(() => {
+        const labels = chartData.map(d => d.label);
+        const incomeData = chartData.map(d => d.income);
+        const savingsData = chartData.map(d => d.savings);
+        const fixedExpenseData = chartData.map(d => d.fixedExpense);
+        const totalExpenseData = chartData.map(d => d.totalExpense);
+        const ratioData = chartData.map(d => d.incomeExpenseRatio);
 
-    const barData = chartData.flatMap((d, i) => [
-        {
-            value: d.income,
-            frontColor: '#4CAF50',
-            label: i === 0 || i === chartData.length - 1 ? d.label : '',
-            spacing: 2,
-            labelWidth: 40,
-        },
-        {
-            value: d.savings,
-            frontColor: '#2196F3',
-            spacing: 2,
-        },
-        {
-            value: d.fixedExpense,
-            frontColor: '#FF9800',
-            spacing: 2,
-        },
-        {
-            value: d.totalExpense,
-            frontColor: '#F44336',
-            spacing: i < chartData.length - 1 ? 16 : 0,
-        },
-    ]);
+        return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: transparent; overflow-x: auto; overflow-y: hidden; }
+        .chart-wrapper {
+            width: ${Math.max(chartData.length * 80, 300)}px;
+            height: 220px;
+            padding: 4px 0;
+        }
+        canvas { width: 100% !important; height: 100% !important; }
+    </style>
+</head>
+<body>
+    <div class="chart-wrapper">
+        <canvas id="chart"></canvas>
+    </div>
+    <script>
+        const ctx = document.getElementById('chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ${JSON.stringify(labels)},
+                datasets: [
+                    {
+                        label: '수입',
+                        data: ${JSON.stringify(incomeData)},
+                        backgroundColor: '#4CAF50',
+                        borderRadius: 3,
+                        order: 2,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: '저축',
+                        data: ${JSON.stringify(savingsData)},
+                        backgroundColor: '#2196F3',
+                        borderRadius: 3,
+                        order: 2,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: '고정',
+                        data: ${JSON.stringify(fixedExpenseData)},
+                        backgroundColor: '#FF9800',
+                        borderRadius: 3,
+                        order: 2,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: '총지출',
+                        data: ${JSON.stringify(totalExpenseData)},
+                        backgroundColor: '#F44336',
+                        borderRadius: 3,
+                        order: 2,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: '지출비율',
+                        data: ${JSON.stringify(ratioData)},
+                        type: 'line',
+                        borderColor: '#9C27B0',
+                        backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#9C27B0',
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        tension: 0.3,
+                        fill: false,
+                        order: 1,
+                        yAxisID: 'y1',
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.parsed.y;
+                                if (context.dataset.yAxisID === 'y1') {
+                                    return label + ': ' + value.toFixed(1) + '%';
+                                }
+                                return label + ': ' + value.toLocaleString('ko-KR') + '원';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11 }, color: '#666' },
+                    },
+                    y: {
+                        position: 'left',
+                        min: 0,
+                        max: 12000000,
+                        ticks: {
+                            stepSize: 2000000,
+                            font: { size: 9 },
+                            color: '#999',
+                            callback: function(value) {
+                                return (value / 10000).toLocaleString();
+                            }
+                        },
+                        grid: { color: 'rgba(0,0,0,0.06)' },
+                    },
+                    y1: {
+                        position: 'right',
+                        min: 0,
+                        max: 120,
+                        ticks: {
+                            stepSize: 20,
+                            font: { size: 9 },
+                            color: '#9C27B0',
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        },
+                        grid: { display: false },
+                    },
+                },
+            },
+        });
 
-    const lineData = chartData.map(d => ({
-        value: d.incomeExpenseRatio,
-    }));
-
-    const maxLineValue = Math.max(...lineData.map(d => d.value), 100);
+        // 초기 스크롤을 오른쪽 끝으로
+        setTimeout(() => { window.scrollTo(document.body.scrollWidth, 0); }, 100);
+    </script>
+</body>
+</html>`;
+    }, [chartData]);
 
     return (
         <View style={styles.card}>
             <Text style={styles.title}>월별 추이</Text>
 
-            {/* 범례 */}
             <View style={styles.legend}>
                 <View style={styles.legendItem}>
                     <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
@@ -80,35 +194,18 @@ export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
                 </View>
             </View>
 
-            <BarChart
-                data={barData}
-                barWidth={10}
-                spacing={2}
-                noOfSections={4}
-                maxValue={maxValue * 1.1}
-                yAxisTextStyle={{ fontSize: 9, color: '#999' }}
-                xAxisLabelTextStyle={{ fontSize: 10, color: '#666' }}
-                hideRules
-                barBorderRadius={2}
-                lineData={lineData}
-                lineConfig={{
-                    color: '#9C27B0',
-                    thickness: 2,
-                    dataPointsColor: '#9C27B0',
-                    dataPointsRadius: 3,
-                    curved: true,
-                    shiftY: 0,
-                    startIndex: 0,
-                    endIndex: lineData.length - 1,
-                }}
-                secondaryYAxis={{
-                    maxValue: maxLineValue * 1.2,
-                    noOfSections: 4,
-                    yAxisTextStyle: { fontSize: 9, color: '#9C27B0' },
-                }}
-                height={180}
-                isAnimated
-            />
+            <View style={styles.chartContainer}>
+                <WebView
+                    source={{ html: htmlContent }}
+                    style={styles.webview}
+                    scrollEnabled={true}
+                    nestedScrollEnabled={true}
+                    showsHorizontalScrollIndicator={false}
+                    javaScriptEnabled={true}
+                    originWhitelist={['*']}
+                    injectedJavaScript="setTimeout(() => { window.scrollTo(document.body.scrollWidth, 0); }, 300);"
+                />
+            </View>
         </View>
     );
 }
@@ -158,5 +255,14 @@ const styles = StyleSheet.create({
     legendText: {
         fontSize: 11,
         color: '#666',
+    },
+    chartContainer: {
+        height: 230,
+        borderRadius: 8,
+        overflow: 'hidden',
+    },
+    webview: {
+        flex: 1,
+        backgroundColor: 'transparent',
     },
 });

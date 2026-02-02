@@ -8,6 +8,10 @@ interface CalendarViewProps {
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
+// Module-level constants - avoids recreating on every render
+const PICKER_YEARS = Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 50 + i);
+const PICKER_MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+
 function getDaysInMonth(year: number, month: number): number {
     return new Date(year, month, 0).getDate();
 }
@@ -78,8 +82,8 @@ export default function CalendarView({ selectedDate, onDateChange }: CalendarVie
         setPickerVisible(true);
     };
 
-    const years = Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - 50 + i);
-    const months = Array.from({ length: 12 }, (_, i) => i + 1);
+    const years = PICKER_YEARS;
+    const months = PICKER_MONTHS;
 
     const handlePickerSelect = (value: number) => {
         if (pickerType === 'year') {

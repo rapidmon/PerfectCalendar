@@ -1,62 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import BudgetItem from './BudgetItem';
 import AddBudgetModal from './AddBudgetModal';
 import BudgetActionModal from './BudgetActionModal';
 import { Budget, BudgetType } from '../types/budget';
 import { formatDateKorean } from '../utils/format';
-import { saveBudgets, loadBudgets, saveCategories, loadCategories, saveAccounts, loadAccounts } from '../utils/storage';
+import { useAppData } from '../contexts/AppDataContext';
 
 interface BudgetListProps {
     selectedDate: Date;
 }
 
 export default function BudgetList({ selectedDate }: BudgetListProps) {
-    const [budgets, setBudgets] = useState<Budget[]>([]);
-    const [categories, setCategories] = useState<string[]>(['식비']);
-    const [accounts, setAccounts] = useState<string[]>(['현금']);
-    const [loading, setLoading] = useState(true);
+    const { budgets, categories, accounts, store } = useAppData();
+
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);
     const [selectedBudget, setSelectedBudget] = useState<Budget | null>(null);
     const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
 
-    // 초기 데이터 로드
-    useEffect(() => {
-        const load = async () => {
-            const [loadedBudgets, loadedCategories, loadedAccounts] = await Promise.all([
-                loadBudgets(),
-                loadCategories(),
-                loadAccounts(),
-            ]);
-            setBudgets(loadedBudgets);
-            setCategories(loadedCategories);
-            setAccounts(loadedAccounts);
-            setLoading(false);
-        };
-        load();
-    }, []);
-
-    // 자동 저장
-    useEffect(() => {
-        if (!loading) {
-            saveBudgets(budgets);
-        }
-    }, [budgets, loading]);
-
-    useEffect(() => {
-        if (!loading) {
-            saveCategories(categories);
-        }
-    }, [categories, loading]);
-
-    useEffect(() => {
-        if (!loading) {
-            saveAccounts(accounts);
-        }
-    }, [accounts, loading]);
-
-    const handleAddBudget = (title: string, money: number, type: BudgetType, category: string, account: string) => {
+    const handleAddBudget = useCallback((title: string, money: number, type: BudgetType, category: string, account: string) => {
         const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
         const newBudget: Budget = {
             id: Date.now().toString(),
@@ -67,116 +30,102 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
             category,
             account,
         };
-        setBudgets(prev => [...prev, newBudget]);
-    };
+        store.addBudget(newBudget);
+    }, [selectedDate, store]);
 
-    const handleUpdateBudget = (id: string, title: string, money: number, type: BudgetType, category: string, account: string) => {
-        setBudgets(prev => prev.map(b =>
-            b.id === id ? { ...b, title, money, type, category, account } : b
-        ));
-    };
+    const handleUpdateBudget = useCallback((id: string, title: string, money: number, type: BudgetType, category: string, account: string) => {
+        store.updateBudget(id, { title, money, type, category, account });
+    }, [store]);
 
-    const handleDeleteBudget = (id: string) => {
-        setBudgets(prev => prev.filter(b => b.id !== id));
-    };
+    const handleDeleteBudget = useCallback((id: string) => {
+        store.deleteBudget(id);
+    }, [store]);
 
-    const handleBudgetPress = (budget: Budget) => {
+    const handleBudgetPress = useCallback((budget: Budget) => {
         setSelectedBudget(budget);
         setActionModalVisible(true);
-    };
+    }, []);
 
-    const handleEdit = () => {
+    const handleEdit = useCallback(() => {
         setActionModalVisible(false);
         setEditingBudget(selectedBudget);
         setAddModalVisible(true);
-    };
+    }, [selectedBudget]);
 
-    const handleDelete = () => {
+    const handleDelete = useCallback(() => {
         if (selectedBudget) {
             handleDeleteBudget(selectedBudget.id);
         }
         setActionModalVisible(false);
         setSelectedBudget(null);
-    };
+    }, [selectedBudget, handleDeleteBudget]);
 
-    const handleAddCategory = (category: string) => {
-        setCategories(prev => [...prev, category]);
-    };
+    const handleAddCategory = useCallback((category: string) => {
+        store.addCategory(category);
+    }, [store]);
 
-    const handleAddAccount = (account: string) => {
-        setAccounts(prev => [...prev, account]);
-    };
+    const handleAddAccount = useCallback((account: string) => {
+        store.addAccount(account);
+    }, [store]);
 
-    const handleCloseAddModal = () => {
+    const handleCloseAddModal = useCallback(() => {
         setAddModalVisible(false);
         setEditingBudget(null);
-    };
+    }, []);
 
-    const handleCloseActionModal = () => {
+    const handleCloseActionModal = useCallback(() => {
         setActionModalVisible(false);
         setSelectedBudget(null);
-    };
+    }, []);
 
-    const filteredBudgets = budgets.filter(budget => {
-        const budgetDate = new Date(budget.date);
-        budgetDate.setHours(0, 0, 0, 0);
-
-        const selected = new Date(selectedDate);
-        selected.setHours(0, 0, 0, 0);
-
-        return budgetDate.getTime() === selected.getTime();
-    });
-
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="small" color="#4A90E2" />
-            </View>
-        );
-    }
+    // Memoized filtering using string comparison (avoids Date object creation)
+    const filteredBudgets = useMemo(() => {
+        const dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+        return budgets.filter(b => b.date === dateStr);
+    }, [budgets, selectedDate]);
 
     return (
         <View style={styles.container}>
-        <View style={styles.header}>
-            <Text style={styles.title}>{formatDateKorean(selectedDate)} 가계부</Text>
-            <TouchableOpacity style={styles.addButton} onPress={() => setAddModalVisible(true)}>
-            <Text style={styles.addButtonText}>+</Text>
-            </TouchableOpacity>
-        </View>
+            <View style={styles.header}>
+                <Text style={styles.title}>{formatDateKorean(selectedDate)} 가계부</Text>
+                <TouchableOpacity style={styles.addButton} onPress={() => setAddModalVisible(true)}>
+                    <Text style={styles.addButtonText}>+</Text>
+                </TouchableOpacity>
+            </View>
 
-        <ScrollView style={styles.scrollView}>
-            {filteredBudgets.length > 0 ? (
-                filteredBudgets.map(budget => (
-                    <BudgetItem
-                    key={budget.id}
-                    budget={budget}
-                    onPress={() => handleBudgetPress(budget)}
-                    />
-                ))
+            <ScrollView style={styles.scrollView}>
+                {filteredBudgets.length > 0 ? (
+                    filteredBudgets.map(budget => (
+                        <BudgetItem
+                            key={budget.id}
+                            budget={budget}
+                            onPress={() => handleBudgetPress(budget)}
+                        />
+                    ))
                 ) : (
-                <Text style={styles.emptyText}>-</Text>
-            )}
-        </ScrollView>
+                    <Text style={styles.emptyText}>-</Text>
+                )}
+            </ScrollView>
 
-        <AddBudgetModal
-            visible={addModalVisible}
-            selectedDate={selectedDate}
-            editingBudget={editingBudget}
-            categories={categories}
-            accounts={accounts}
-            onClose={handleCloseAddModal}
-            onAdd={handleAddBudget}
-            onUpdate={handleUpdateBudget}
-            onAddCategory={handleAddCategory}
-            onAddAccount={handleAddAccount}
-        />
+            <AddBudgetModal
+                visible={addModalVisible}
+                selectedDate={selectedDate}
+                editingBudget={editingBudget}
+                categories={categories}
+                accounts={accounts}
+                onClose={handleCloseAddModal}
+                onAdd={handleAddBudget}
+                onUpdate={handleUpdateBudget}
+                onAddCategory={handleAddCategory}
+                onAddAccount={handleAddAccount}
+            />
 
-        <BudgetActionModal
-            visible={actionModalVisible}
-            onClose={handleCloseActionModal}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-        />
+            <BudgetActionModal
+                visible={actionModalVisible}
+                onClose={handleCloseActionModal}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+            />
         </View>
     );
 }
@@ -189,10 +138,6 @@ const styles = StyleSheet.create({
         borderColor: '#ddd',
         borderRadius: 12,
         padding: 15,
-    },
-    loadingContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     header: {
         flexDirection: 'row',

@@ -1,118 +1,101 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import TodoItem from './TodoItem';
 import AddTodoModal from './AddTodoModal';
 import TodoActionModal from './TodoActionModal';
 import { Todo, TodoType } from '../types/todo';
 import { formatDateKorean } from '../utils/format';
-import { loadTodos, saveTodos } from '../utils/storage';
+import { useAppData } from '../contexts/AppDataContext';
 
 interface TodoListProps {
     selectedDate: Date;
 }
 
+const formatLocalDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 export default function TodoList({ selectedDate }: TodoListProps) {
-  const [todos, setTodos] = useState<Todo[]>([]);  // 빈 배열로 시작!
-  const [isLoading, setIsLoading] = useState(true);  // 로딩 상태 추가
+    const { todos, store } = useAppData();
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);
     const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
     const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
-    
-    useEffect(() => {
-        const initTodos = async () => {
-        const loadedTodos = await loadTodos();
-        setTodos(loadedTodos);
-        setIsLoading(false);
-        };
-        initTodos();
-    }, []);
 
-    useEffect(() => {
-        if (!isLoading) {  // 초기 로딩 중에는 저장 안 함
-            saveTodos(todos);
-        }
-    }, [todos]);
-
-    const handleAddTodo = () => {
+    const handleAddTodo = useCallback(() => {
         setEditingTodo(null);
         setAddModalVisible(true);
-    };
+    }, []);
 
-    const handleTodoPress = (todo: Todo) => {
+    const handleTodoPress = useCallback((todo: Todo) => {
         setSelectedTodo(todo);
         setActionModalVisible(true);
-    };
+    }, []);
 
-    const handleEditTodo = () => {
+    const handleEditTodo = useCallback(() => {
         setActionModalVisible(false);
         setEditingTodo(selectedTodo);
         setAddModalVisible(true);
-    };
+    }, [selectedTodo]);
 
-    const handleDeleteTodo = () => {
+    const handleDeleteTodo = useCallback(() => {
         if (selectedTodo) {
-        Alert.alert(
-            '삭제 확인',
-            '정말 삭제하시겠습니까?',
-            [
-            { text: '취소', style: 'cancel' },
-            {
-                text: '삭제',
-                style: 'destructive',
-                onPress: () => {
-                setTodos(todos.filter(t => t.id !== selectedTodo.id));
-                setActionModalVisible(false);
-                setSelectedTodo(null);
-                },
-            },
-            ]
-        );
+            Alert.alert(
+                '삭제 확인',
+                '정말 삭제하시겠습니까?',
+                [
+                    { text: '취소', style: 'cancel' },
+                    {
+                        text: '삭제',
+                        style: 'destructive',
+                        onPress: () => {
+                            store.deleteTodo(selectedTodo.id);
+                            setActionModalVisible(false);
+                            setSelectedTodo(null);
+                        },
+                    },
+                ]
+            );
         }
-    };
+    }, [selectedTodo, store]);
 
-    const formatLocalDate = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    };
-
-    const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
+    const handleAddTodoConfirm = useCallback((title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
         const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: formatLocalDate(new Date()) };
 
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
 
         switch (type) {
-        case 'RECURRING':
-            newTodo.recurringDay = dayOfWeek;
-            break;
-        case 'MONTHLY_RECURRING':
-            newTodo.monthlyRecurringDay = dateToUse.getDate();
-            break;
-        case 'DEADLINE':
-            newTodo.deadline = formatLocalDate(dateToUse);
-            break;
-        case 'SPECIFIC':
-            newTodo.specificDate = formatLocalDate(dateToUse);
-            break;
-        case 'DATE_RANGE':
-            newTodo.dateRangeStart = formatLocalDate(dateToUse);
-            newTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
-            break;
+            case 'RECURRING':
+                newTodo.recurringDay = dayOfWeek;
+                break;
+            case 'MONTHLY_RECURRING':
+                newTodo.monthlyRecurringDay = dateToUse.getDate();
+                break;
+            case 'DEADLINE':
+                newTodo.deadline = formatLocalDate(dateToUse);
+                break;
+            case 'SPECIFIC':
+                newTodo.specificDate = formatLocalDate(dateToUse);
+                break;
+            case 'DATE_RANGE':
+                newTodo.dateRangeStart = formatLocalDate(dateToUse);
+                newTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
+                break;
         }
 
-        setTodos([...todos, newTodo]);
-    };
+        store.addTodo(newTodo);
+    }, [selectedDate, store]);
 
-    const handleUpdateTodo = (id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
+    const handleUpdateTodo = useCallback((id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
 
-        setTodos(todos.map(todo => {
-        if (todo.id === id) {
+        store.updateTodo(id, (todo) => {
             const updatedTodo: Todo = {
                 ...todo,
                 title,
@@ -126,90 +109,62 @@ export default function TodoList({ selectedDate }: TodoListProps) {
             };
 
             switch (type) {
-            case 'RECURRING':
-                updatedTodo.recurringDay = dayOfWeek;
-                break;
-            case 'MONTHLY_RECURRING':
-                updatedTodo.monthlyRecurringDay = dateToUse.getDate();
-                break;
-            case 'DEADLINE':
-                updatedTodo.deadline = formatLocalDate(dateToUse);
-                break;
-            case 'SPECIFIC':
-                updatedTodo.specificDate = formatLocalDate(dateToUse);
-                break;
-            case 'DATE_RANGE':
-                updatedTodo.dateRangeStart = formatLocalDate(dateToUse);
-                updatedTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
-                break;
+                case 'RECURRING':
+                    updatedTodo.recurringDay = dayOfWeek;
+                    break;
+                case 'MONTHLY_RECURRING':
+                    updatedTodo.monthlyRecurringDay = dateToUse.getDate();
+                    break;
+                case 'DEADLINE':
+                    updatedTodo.deadline = formatLocalDate(dateToUse);
+                    break;
+                case 'SPECIFIC':
+                    updatedTodo.specificDate = formatLocalDate(dateToUse);
+                    break;
+                case 'DATE_RANGE':
+                    updatedTodo.dateRangeStart = formatLocalDate(dateToUse);
+                    updatedTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
+                    break;
             }
 
             return updatedTodo;
-        }
-        return todo;
-        }));
-    };
+        });
+    }, [selectedDate, store]);
 
-    const handleToggleTodo = (id: string) => {
-        setTodos(todos.map(todo => 
-            todo.id === id ? { ...todo, completed: !todo.completed } : todo
-        ));
-    };
+    const handleToggleTodo = useCallback((id: string) => {
+        store.toggleTodo(id);
+    }, [store]);
 
-    const filteredTodos = todos.filter(todo => {
-        if (todo.type === 'RECURRING' && todo.recurringDay) {
-            const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()];
-            return dayOfWeek === todo.recurringDay;
-        }
-        
-        if (todo.type === 'MONTHLY_RECURRING' && todo.monthlyRecurringDay) {
-            return selectedDate.getDate() === todo.monthlyRecurringDay;
-        }
+    // Memoized filtering - avoids recomputation on unrelated re-renders
+    const filteredTodos = useMemo(() => {
+        return todos.filter(todo => {
+            if (todo.type === 'RECURRING' && todo.recurringDay) {
+                const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()];
+                return dayOfWeek === todo.recurringDay;
+            }
 
-        if (todo.type === 'DEADLINE' && todo.deadline) {
-            const deadlineDate = new Date(todo.deadline);
-            deadlineDate.setHours(0, 0, 0, 0);
-            const selected = new Date(selectedDate);
-            selected.setHours(0, 0, 0, 0);
-            
-            return selected <= deadlineDate;
-        }
+            if (todo.type === 'MONTHLY_RECURRING' && todo.monthlyRecurringDay) {
+                return selectedDate.getDate() === todo.monthlyRecurringDay;
+            }
 
-        if (todo.type === 'SPECIFIC' && todo.specificDate) {
-            const specificDate = new Date(todo.specificDate);
-            specificDate.setHours(0, 0, 0, 0);
-            const selected = new Date(selectedDate);
-            selected.setHours(0, 0, 0, 0);
+            if (todo.type === 'DEADLINE' && todo.deadline) {
+                const selectedStr = formatLocalDate(selectedDate);
+                return selectedStr <= todo.deadline;
+            }
 
-            return selected.getTime() === specificDate.getTime();
-        }
+            if (todo.type === 'SPECIFIC' && todo.specificDate) {
+                const selectedStr = formatLocalDate(selectedDate);
+                return selectedStr === todo.specificDate;
+            }
 
-        if (todo.type === 'DATE_RANGE' && todo.dateRangeStart && todo.dateRangeEnd) {
-            const rangeStart = new Date(todo.dateRangeStart);
-            rangeStart.setHours(0, 0, 0, 0);
-            const rangeEnd = new Date(todo.dateRangeEnd);
-            rangeEnd.setHours(0, 0, 0, 0);
-            const selected = new Date(selectedDate);
-            selected.setHours(0, 0, 0, 0);
+            if (todo.type === 'DATE_RANGE' && todo.dateRangeStart && todo.dateRangeEnd) {
+                const selectedStr = formatLocalDate(selectedDate);
+                return selectedStr >= todo.dateRangeStart && selectedStr <= todo.dateRangeEnd;
+            }
 
-            return selected >= rangeStart && selected <= rangeEnd;
-        }
-
-        return false;
-    });
-
-    if (isLoading) {
-        return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-            <Text style={styles.title}>{formatDateKorean(selectedDate)} 할 일</Text>
-            </View>
-            <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>불러오는 중...</Text>
-            </View>
-        </View>
-        );
-    }
+            return false;
+        });
+    }, [todos, selectedDate]);
 
     return (
         <View style={styles.container}>
@@ -224,7 +179,7 @@ export default function TodoList({ selectedDate }: TodoListProps) {
                 {filteredTodos.length > 0 ? (
                     filteredTodos.map(todo => (
                         <TouchableOpacity key={todo.id} onPress={() => handleTodoPress(todo)} activeOpacity={0.7}>
-                            <TodoItem 
+                            <TodoItem
                                 todo={todo}
                                 onToggle={handleToggleTodo}
                                 selectedDate={selectedDate}
@@ -240,8 +195,8 @@ export default function TodoList({ selectedDate }: TodoListProps) {
                 selectedDate={selectedDate}
                 editingTodo={editingTodo}
                 onClose={() => {
-                setAddModalVisible(false);
-                setEditingTodo(null);
+                    setAddModalVisible(false);
+                    setEditingTodo(null);
                 }}
                 onAdd={handleAddTodoConfirm}
                 onUpdate={handleUpdateTodo}
@@ -249,8 +204,8 @@ export default function TodoList({ selectedDate }: TodoListProps) {
             <TodoActionModal
                 visible={actionModalVisible}
                 onClose={() => {
-                setActionModalVisible(false);
-                setSelectedTodo(null);
+                    setActionModalVisible(false);
+                    setSelectedTodo(null);
                 }}
                 onEdit={handleEditTodo}
                 onDelete={handleDeleteTodo}
@@ -300,15 +255,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: '#999',
         marginTop: 20,
-        fontSize: 14,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    loadingText: {
-        color: '#999',
         fontSize: 14,
     },
 });

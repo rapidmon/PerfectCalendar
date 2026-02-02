@@ -7,19 +7,63 @@ import BudgetList from './components/BudgetList';
 import TodoFullList from './components/TodoFullList';
 import BudgetFullList from './components/BudgetFullList';
 import OnboardingScreen from './components/OnboardingScreen';
+import { AppDataProvider, useAppData } from './contexts/AppDataContext';
 import { useState, useEffect } from 'react';
 import { loadOnboardingComplete } from './utils/storage';
 
 type TabType = 'home' | 'todo' | 'budget';
 
 export default function App() {
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [activeTab, setActiveTab] = useState<TabType>('home');
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadOnboardingComplete().then(setOnboardingComplete);
   }, []);
+
+  if (onboardingComplete === null) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4A90E2" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  if (!onboardingComplete) {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container}>
+          <OnboardingScreen onComplete={() => setOnboardingComplete(true)} />
+        </SafeAreaView>
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    );
+  }
+
+  return (
+    <SafeAreaProvider>
+      <AppDataProvider>
+        <AppContent />
+      </AppDataProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent() {
+  const { isLoaded } = useAppData();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [activeTab, setActiveTab] = useState<TabType>('home');
+
+  if (!isLoaded) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#4A90E2" />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -49,61 +93,38 @@ export default function App() {
     }
   };
 
-  if (onboardingComplete === null) {
-    return (
-      <SafeAreaProvider>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-        </View>
-      </SafeAreaProvider>
-    );
-  }
-
-  if (!onboardingComplete) {
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.container}>
-          <OnboardingScreen onComplete={() => setOnboardingComplete(true)} />
-        </SafeAreaView>
-        <StatusBar style="auto" />
-      </SafeAreaProvider>
-    );
-  }
-
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
-          {renderContent()}
-        </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        {renderContent()}
+      </View>
 
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => setActiveTab('todo')}
-          >
-            <Text style={[styles.tabIcon, activeTab === 'todo' && styles.tabIconActive]}>✅</Text>
-            <Text style={[styles.tabLabel, activeTab === 'todo' && styles.tabLabelActive]}>할 일</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => setActiveTab('home')}
-          >
-            <Text style={[styles.tabIcon, activeTab === 'home' && styles.tabIconActive]}>🏠</Text>
-            <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>홈</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.tabItem}
-            onPress={() => setActiveTab('budget')}
-          >
-            <Text style={[styles.tabIcon, activeTab === 'budget' && styles.tabIconActive]}>💰</Text>
-            <Text style={[styles.tabLabel, activeTab === 'budget' && styles.tabLabelActive]}>가계부</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setActiveTab('todo')}
+        >
+          <Text style={[styles.tabIcon, activeTab === 'todo' && styles.tabIconActive]}>✅</Text>
+          <Text style={[styles.tabLabel, activeTab === 'todo' && styles.tabLabelActive]}>할 일</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setActiveTab('home')}
+        >
+          <Text style={[styles.tabIcon, activeTab === 'home' && styles.tabIconActive]}>🏠</Text>
+          <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>홈</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setActiveTab('budget')}
+        >
+          <Text style={[styles.tabIcon, activeTab === 'budget' && styles.tabIconActive]}>💰</Text>
+          <Text style={[styles.tabLabel, activeTab === 'budget' && styles.tabLabelActive]}>가계부</Text>
+        </TouchableOpacity>
+      </View>
 
-        <StatusBar style="auto" />
-      </SafeAreaView>
-    </SafeAreaProvider>
+      <StatusBar style="auto" />
+    </SafeAreaView>
   );
 }
 

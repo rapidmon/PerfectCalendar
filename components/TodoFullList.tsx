@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import AddTodoModal from './AddTodoModal';
 import TodoActionModal from './TodoActionModal';
 import { Todo, TodoType } from '../types/todo';
-import { loadTodos, saveTodos } from '../utils/storage';
+import { useAppData } from '../contexts/AppDataContext';
 
 interface TodoFullListProps {
     selectedDate: Date;
@@ -72,46 +72,50 @@ function getTodoDateInfo(todo: Todo): { dateKey: string; dateLabel: string; sort
     return { dateKey: 'unknown', dateLabel: '기타', sortKey: 'zzz' };
 }
 
+function isTodoOverdue(todo: Todo): boolean {
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    switch (todo.type) {
+        case 'SPECIFIC':
+            return !!todo.specificDate && todo.specificDate < todayStr;
+        case 'DEADLINE':
+            return !!todo.deadline && todo.deadline < todayStr;
+        case 'DATE_RANGE':
+            return !!todo.dateRangeEnd && todo.dateRangeEnd < todayStr;
+        case 'RECURRING':
+        case 'MONTHLY_RECURRING':
+            return false;
+    }
+}
+
+const formatLocalDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
 export default function TodoFullList({ selectedDate }: TodoFullListProps) {
-    const [todos, setTodos] = useState<Todo[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { todos, store } = useAppData();
+
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);
     const [selectedTodo, setSelectedTodo] = useState<Todo | null>(null);
     const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
 
-    useEffect(() => {
-        const init = async () => {
-            const loaded = await loadTodos();
-            setTodos(loaded);
-            setIsLoading(false);
-        };
-        init();
-    }, []);
-
-    useEffect(() => {
-        if (!isLoading) {
-            saveTodos(todos);
-        }
-    }, [todos, isLoading]);
-
-    const handleAddTodo = () => {
-        setEditingTodo(null);
-        setAddModalVisible(true);
-    };
-
-    const handleTodoPress = (todo: Todo) => {
+    const handleTodoPress = useCallback((todo: Todo) => {
         setSelectedTodo(todo);
         setActionModalVisible(true);
-    };
+    }, []);
 
-    const handleEditTodo = () => {
+    const handleEditTodo = useCallback(() => {
         setActionModalVisible(false);
         setEditingTodo(selectedTodo);
         setAddModalVisible(true);
-    };
+    }, [selectedTodo]);
 
-    const handleDeleteTodo = () => {
+    const handleDeleteTodo = useCallback(() => {
         if (selectedTodo) {
             Alert.alert('삭제 확인', '정말 삭제하시겠습니까?', [
                 { text: '취소', style: 'cancel' },
@@ -119,147 +123,134 @@ export default function TodoFullList({ selectedDate }: TodoFullListProps) {
                     text: '삭제',
                     style: 'destructive',
                     onPress: () => {
-                        setTodos(prev => prev.filter(t => t.id !== selectedTodo.id));
+                        store.deleteTodo(selectedTodo.id);
                         setActionModalVisible(false);
                         setSelectedTodo(null);
                     },
                 },
             ]);
         }
-    };
+    }, [selectedTodo, store]);
 
-    const formatLocalDate = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, '0');
-        const d = String(date.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-    };
-
-    const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
-        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: formatLocalDate(new Date()) };
+    const handleUpdateTodo = useCallback((id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
 
-        switch (type) {
-            case 'RECURRING':
-                newTodo.recurringDay = dayOfWeek;
-                break;
-            case 'MONTHLY_RECURRING':
-                newTodo.monthlyRecurringDay = dateToUse.getDate();
-                break;
-            case 'DEADLINE':
-                newTodo.deadline = formatLocalDate(dateToUse);
-                break;
-            case 'SPECIFIC':
-                newTodo.specificDate = formatLocalDate(dateToUse);
-                break;
-            case 'DATE_RANGE':
-                newTodo.dateRangeStart = formatLocalDate(dateToUse);
-                newTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
-                break;
-        }
-        setTodos(prev => [...prev, newTodo]);
-    };
-
-    const handleUpdateTodo = (id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
-        const dateToUse = customDate || selectedDate;
-        const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
-
-        setTodos(prev => prev.map(todo => {
-            if (todo.id === id) {
-                const updated: Todo = {
-                    ...todo, title, type,
-                    recurringDay: undefined,
-                    monthlyRecurringDay: undefined,
-                    deadline: undefined,
-                    specificDate: undefined,
-                    dateRangeStart: undefined,
-                    dateRangeEnd: undefined,
-                };
-                switch (type) {
-                    case 'RECURRING': updated.recurringDay = dayOfWeek; break;
-                    case 'MONTHLY_RECURRING': updated.monthlyRecurringDay = dateToUse.getDate(); break;
-                    case 'DEADLINE': updated.deadline = formatLocalDate(dateToUse); break;
-                    case 'SPECIFIC': updated.specificDate = formatLocalDate(dateToUse); break;
-                    case 'DATE_RANGE':
-                        updated.dateRangeStart = formatLocalDate(dateToUse);
-                        updated.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
-                        break;
-                }
-                return updated;
+        store.updateTodo(id, (todo) => {
+            const updated: Todo = {
+                ...todo, title, type,
+                recurringDay: undefined,
+                monthlyRecurringDay: undefined,
+                deadline: undefined,
+                specificDate: undefined,
+                dateRangeStart: undefined,
+                dateRangeEnd: undefined,
+            };
+            switch (type) {
+                case 'RECURRING': updated.recurringDay = dayOfWeek; break;
+                case 'MONTHLY_RECURRING': updated.monthlyRecurringDay = dateToUse.getDate(); break;
+                case 'DEADLINE': updated.deadline = formatLocalDate(dateToUse); break;
+                case 'SPECIFIC': updated.specificDate = formatLocalDate(dateToUse); break;
+                case 'DATE_RANGE':
+                    updated.dateRangeStart = formatLocalDate(dateToUse);
+                    updated.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
+                    break;
             }
-            return todo;
-        }));
+            return updated;
+        });
+    }, [selectedDate, store]);
+
+    const handleToggleTodo = useCallback((id: string) => {
+        store.toggleTodo(id);
+    }, [store]);
+
+    const { activeTodos, overdueTodos, completedTodos } = useMemo(() => {
+        const active: TodoWithDateKey[] = [];
+        const overdue: TodoWithDateKey[] = [];
+        const completed: TodoWithDateKey[] = [];
+
+        for (const todo of todos) {
+            const dateInfo = getTodoDateInfo(todo);
+            const item: TodoWithDateKey = { todo, ...dateInfo };
+
+            if (todo.completed) {
+                completed.push(item);
+            } else if (isTodoOverdue(todo)) {
+                overdue.push(item);
+            } else {
+                active.push(item);
+            }
+        }
+
+        active.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+        overdue.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+        completed.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+
+        return { activeTodos: active, overdueTodos: overdue, completedTodos: completed };
+    }, [todos]);
+
+    const renderTodoGroup = (items: TodoWithDateKey[], cardStyle?: object) => {
+        const dateHeaders = new Set<string>();
+        return items.map((item) => {
+            const showHeader = !dateHeaders.has(item.dateKey);
+            if (showHeader) dateHeaders.add(item.dateKey);
+
+            return (
+                <View key={item.todo.id}>
+                    {showHeader && (
+                        <Text style={styles.dateHeader}>{item.dateLabel}</Text>
+                    )}
+                    <TouchableOpacity
+                        style={[styles.card, cardStyle]}
+                        onPress={() => handleTodoPress(item.todo)}
+                        activeOpacity={0.7}
+                    >
+                        <TouchableOpacity
+                            style={styles.checkbox}
+                            onPress={() => handleToggleTodo(item.todo.id)}
+                        >
+                            {item.todo.completed && <View style={styles.checkmark} />}
+                        </TouchableOpacity>
+                        <Text style={[
+                            styles.cardTitle,
+                            item.todo.completed && styles.cardTitleCompleted,
+                        ]}>
+                            {item.todo.title}
+                        </Text>
+                        <Text style={styles.typeTag}>{getTypeLabel(item.todo.type)}</Text>
+                    </TouchableOpacity>
+                </View>
+            );
+        });
     };
 
-    const handleToggleTodo = (id: string) => {
-        setTodos(prev => prev.map(todo =>
-            todo.id === id ? { ...todo, completed: !todo.completed } : todo
-        ));
-    };
-
-    // 날짜 정보 붙여서 정렬
-    const todosWithDate: TodoWithDateKey[] = todos.map(todo => ({
-        todo,
-        ...getTodoDateInfo(todo),
-    }));
-    todosWithDate.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
-
-    // 날짜별 그룹핑 (렌더링 시 날짜 헤더 표시용)
-    const dateHeaders = new Set<string>();
-
-    if (isLoading) {
-        return (
-            <View style={styles.container}>
-                <ActivityIndicator size="small" color="#4A90E2" />
-            </View>
-        );
-    }
+    const hasBottomSection = overdueTodos.length > 0 || completedTodos.length > 0;
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>할 일 전체</Text>
-                <TouchableOpacity style={styles.headerAddButton} onPress={handleAddTodo}>
-                    <Text style={styles.headerAddText}>+</Text>
-                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-                {todosWithDate.length > 0 ? (
-                    todosWithDate.map((item) => {
-                        const showHeader = !dateHeaders.has(item.dateKey);
-                        if (showHeader) dateHeaders.add(item.dateKey);
-
-                        return (
-                            <View key={item.todo.id}>
-                                {showHeader && (
-                                    <Text style={styles.dateHeader}>{item.dateLabel}</Text>
-                                )}
-                                <TouchableOpacity
-                                    style={styles.card}
-                                    onPress={() => handleTodoPress(item.todo)}
-                                    activeOpacity={0.7}
-                                >
-                                    <TouchableOpacity
-                                        style={styles.checkbox}
-                                        onPress={() => handleToggleTodo(item.todo.id)}
-                                    >
-                                        {item.todo.completed && <View style={styles.checkmark} />}
-                                    </TouchableOpacity>
-                                    <Text style={[
-                                        styles.cardTitle,
-                                        item.todo.completed && styles.cardTitleCompleted,
-                                    ]}>
-                                        {item.todo.title}
-                                    </Text>
-                                    <Text style={styles.typeTag}>{getTypeLabel(item.todo.type)}</Text>
-                                </TouchableOpacity>
-                            </View>
-                        );
-                    })
+                {activeTodos.length > 0 ? (
+                    renderTodoGroup(activeTodos)
                 ) : (
-                    <Text style={styles.emptyText}>할 일이 없습니다</Text>
+                    !hasBottomSection && <Text style={styles.emptyText}>할 일이 없습니다</Text>
+                )}
+
+                {overdueTodos.length > 0 && (
+                    <>
+                        <Text style={styles.sectionHeader}>기한 지남</Text>
+                        {renderTodoGroup(overdueTodos, styles.cardOverdue)}
+                    </>
+                )}
+
+                {completedTodos.length > 0 && (
+                    <>
+                        <Text style={styles.sectionHeader}>완료</Text>
+                        {renderTodoGroup(completedTodos, styles.cardCompleted)}
+                    </>
                 )}
             </ScrollView>
 
@@ -268,7 +259,7 @@ export default function TodoFullList({ selectedDate }: TodoFullListProps) {
                 selectedDate={selectedDate}
                 editingTodo={editingTodo}
                 onClose={() => { setAddModalVisible(false); setEditingTodo(null); }}
-                onAdd={handleAddTodoConfirm}
+                onAdd={() => {}}
                 onUpdate={handleUpdateTodo}
             />
             <TodoActionModal
@@ -307,22 +298,19 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#333',
     },
-    headerAddButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        backgroundColor: '#4A90E2',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerAddText: {
-        color: '#fff',
-        fontSize: 20,
-        lineHeight: 22,
-        fontWeight: 'bold',
-    },
     scrollView: {
         flex: 1,
+    },
+    sectionHeader: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#666',
+        marginTop: 20,
+        marginBottom: 8,
+        paddingHorizontal: 4,
+        paddingVertical: 4,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e0e0e0',
     },
     dateHeader: {
         fontSize: 13,
@@ -342,6 +330,14 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 14,
         marginBottom: 8,
+    },
+    cardOverdue: {
+        backgroundColor: '#FFF9C4',
+        borderColor: '#FFF176',
+    },
+    cardCompleted: {
+        backgroundColor: '#E8F5E9',
+        borderColor: '#C8E6C9',
     },
     checkbox: {
         width: 18,

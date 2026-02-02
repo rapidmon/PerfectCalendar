@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MonthlyStats, computeYoYGrowthRate } from '../utils/budgetAnalytics';
 import { Budget } from '../types/budget';
@@ -24,17 +24,21 @@ export default function MonthlySummaryCard({
 }: MonthlySummaryCardProps) {
     const [expenseExpanded, setExpenseExpanded] = useState(false);
 
-    const expenseGrowth = computeYoYGrowthRate(
-        stats.totalExpense, budgets, year - 1, month, fixedCategories, 'totalExpense'
+    // Memoized YoY calculations - avoids recomputing on every render
+    const expenseGrowth = useMemo(
+        () => computeYoYGrowthRate(stats.totalExpense, budgets, year - 1, month, fixedCategories, 'totalExpense'),
+        [stats.totalExpense, budgets, year, month, fixedCategories]
     );
-    const fixedGrowth = computeYoYGrowthRate(
-        stats.totalFixedExpense, budgets, year - 1, month, fixedCategories, 'totalFixedExpense'
+
+    const fixedGrowth = useMemo(
+        () => computeYoYGrowthRate(stats.totalFixedExpense, budgets, year - 1, month, fixedCategories, 'totalFixedExpense'),
+        [stats.totalFixedExpense, budgets, year, month, fixedCategories]
     );
 
     const formatAmount = (n: number) => n.toLocaleString('ko-KR') + '원';
     const formatRatio = (n: number) => n.toFixed(1) + '%';
 
-    const goalDiff = goalAmount ? goalAmount - stats.totalExpense : undefined;
+    const goalDiff = goalAmount ? goalAmount - (stats.totalExpense - stats.totalFixedExpense) : undefined;
     const isOverBudget = goalDiff !== undefined && goalDiff < 0;
 
     const formatGrowth = (value: number | null) => {
@@ -65,6 +69,14 @@ export default function MonthlySummaryCard({
                             </Text>
                         </View>
                     ))}
+                </View>
+            )}
+
+            {/* 이번 달 지출 목표 */}
+            {goalAmount != null && (
+                <View style={styles.goalRow}>
+                    <Text style={styles.goalLabel}>이번 달 지출 목표</Text>
+                    <Text style={styles.goalValue}>{formatAmount(goalAmount)}</Text>
                 </View>
             )}
 
@@ -164,6 +176,26 @@ const styles = StyleSheet.create({
     },
     section: {
         marginBottom: 16,
+    },
+    goalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#E3F2FD',
+        borderRadius: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        marginBottom: 16,
+    },
+    goalLabel: {
+        fontSize: 13,
+        color: '#555',
+        fontWeight: '600',
+    },
+    goalValue: {
+        fontSize: 14,
+        color: '#4A90E2',
+        fontWeight: 'bold',
     },
     sectionTitle: {
         fontSize: 15,

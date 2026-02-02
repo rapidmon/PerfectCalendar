@@ -13,6 +13,8 @@ struct TodoItem: Codable, Identifiable {
     let createdAt: String?
     let recurringDay: String?
     let monthlyRecurringDay: Int?
+    let dateRangeStart: String?
+    let dateRangeEnd: String?
 }
 
 struct BudgetItem: Codable, Identifiable {
@@ -30,22 +32,31 @@ struct BudgetItem: Codable, Identifiable {
 struct DataProvider {
     static let appGroup = "group.com.perfectcalendar.app"
 
+    private static func defaults() -> UserDefaults? {
+        UserDefaults(suiteName: appGroup)
+    }
+
+    private static func loadJSON<T: Decodable>(_ key: String) -> T? {
+        guard let defaults = defaults(),
+              let jsonString = defaults.string(forKey: key),
+              let data = jsonString.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
     static func loadTodos() -> [TodoItem] {
-        guard let defaults = UserDefaults(suiteName: appGroup),
-              let jsonString = defaults.string(forKey: "widget_todos"),
-              let data = jsonString.data(using: .utf8) else {
-            return []
-        }
-        return (try? JSONDecoder().decode([TodoItem].self, from: data)) ?? []
+        loadJSON("widget_todos") ?? []
     }
 
     static func loadBudgets() -> [BudgetItem] {
-        guard let defaults = UserDefaults(suiteName: appGroup),
-              let jsonString = defaults.string(forKey: "widget_budgets"),
-              let data = jsonString.data(using: .utf8) else {
-            return []
-        }
-        return (try? JSONDecoder().decode([BudgetItem].self, from: data)) ?? []
+        loadJSON("widget_budgets") ?? []
+    }
+
+    static func loadAccounts() -> [String] {
+        loadJSON("widget_accounts") ?? []
+    }
+
+    static func loadAccountBalances() -> [String: Int] {
+        loadJSON("widget_account_balances") ?? [:]
     }
 }
 
@@ -55,11 +66,13 @@ struct CalendarEntry: TimelineEntry {
     let date: Date
     let todos: [TodoItem]
     let budgets: [BudgetItem]
+    let accounts: [String]
+    let accountBalances: [String: Int]
 }
 
 struct CalendarTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> CalendarEntry {
-        CalendarEntry(date: Date(), todos: [], budgets: [])
+        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], accountBalances: [:])
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CalendarEntry) -> Void) {
@@ -76,18 +89,14 @@ struct CalendarTimelineProvider: TimelineProvider {
         CalendarEntry(
             date: Date(),
             todos: DataProvider.loadTodos(),
-            budgets: DataProvider.loadBudgets()
+            budgets: DataProvider.loadBudgets(),
+            accounts: DataProvider.loadAccounts(),
+            accountBalances: DataProvider.loadAccountBalances()
         )
     }
 }
 
 // MARK: - Helper Functions
-
-func currentYearMonth() -> String {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM"
-    return formatter.string(from: Date())
-}
 
 func formatKoreanCurrency(_ amount: Int) -> String {
     let formatter = NumberFormatter()
@@ -105,6 +114,138 @@ func daysUntil(_ dateString: String) -> Int {
     return cal.dateComponents([.day], from: today, to: target).day ?? 999
 }
 
+func todayString() -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: Date())
+}
+
+// MARK: - Progress Bar (matches Android 20-block bar)
+
+enum BlockColor {
+    case green, orange, red, gray
+
+    var color: Color {
+        switch self {
+        case .green: return Color(red: 0.30, green: 0.69, blue: 0.31)
+        case .orange: return Color(red: 1.0, green: 0.60, blue: 0.0)
+        case .red: return Color(red: 0.96, green: 0.26, blue: 0.21)
+        case .gray: return Color(red: 0.88, green: 0.88, blue: 0.88)
+        }
+    }
+}
+
+struct TodoProgressInfo {
+    let hasProgress: Bool
+    let blocks: [BlockColor]
+    let daysLeft: Int
+    let label: String
+}
+
+func calculateTodoProgress(_ todo: TodoItem) -> TodoProgressInfo {
+    let totalBlocks = 20
+    let today = todayString()
+
+    var targetDateStr: String? = nil
+    var label = ""
+
+    switch todo.type {
+    case "DEADLINE":
+        targetDateStr = todo.deadline
+        label = "마감"
+    case "SPECIFIC":
+        targetDateStr = todo.specificDate
+        label = "당일"
+    case "DATE_RANGE":
+        if let start = todo.dateRangeStart, let end = todo.dateRangeEnd {
+            if today < start {
+                targetDateStr = start
+                label = "시작"
+            } else {
+                targetDateStr = end
+                label = "종료"
+            }
+        }
+    default:
+        return TodoProgressInfo(hasProgress: false, blocks: [], daysLeft: 0, label: "")
+    }
+
+    guard let target = targetDateStr else {
+        return TodoProgressInfo(hasProgress: false, blocks: [], daysLeft: 0, label: "")
+    }
+
+    let daysLeft = max(0, daysUntil(target))
+
+    let blockColor: BlockColor
+    if daysLeft <= 1 {
+        blockColor = .red
+    } else if daysLeft <= 5 {
+        blockColor = .orange
+    } else {
+        blockColor = .green
+    }
+
+    let filledBlocks = min(daysLeft, totalBlocks)
+    var blocks: [BlockColor] = []
+    for i in 0..<totalBlocks {
+        blocks.append(i < filledBlocks ? blockColor : .gray)
+    }
+
+    return TodoProgressInfo(hasProgress: true, blocks: blocks, daysLeft: daysLeft, label: label)
+}
+
+// MARK: - Progress Bar View
+
+struct ProgressBarView: View {
+    let blocks: [BlockColor]
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ForEach(0..<blocks.count, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(blocks[i].color)
+                    .frame(height: 6)
+            }
+        }
+    }
+}
+
+// MARK: - Todo Card View (matches Android TodoCard)
+
+struct TodoCardView: View {
+    let todo: TodoItem
+
+    var body: some View {
+        let progress = calculateTodoProgress(todo)
+
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(todo.title)
+                    .font(.system(size: 13))
+                    .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                    .lineLimit(1)
+                Spacer()
+            }
+
+            if progress.hasProgress {
+                ProgressBarView(blocks: progress.blocks)
+
+                Text(progress.daysLeft == 0
+                     ? "오늘 \(progress.label)"
+                     : "\(progress.daysLeft)일 뒤 \(progress.label)")
+                    .font(.system(size: 10))
+                    .foregroundColor(progress.daysLeft <= 3
+                        ? Color(red: 0.96, green: 0.26, blue: 0.21)
+                        : .gray)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.white)
+        .cornerRadius(10)
+    }
+}
+
 // MARK: - Todo Section View
 
 struct TodoSectionView: View {
@@ -113,80 +254,97 @@ struct TodoSectionView: View {
 
     var activeTodos: [TodoItem] {
         todos
-            .filter { !$0.completed && ($0.type == "DEADLINE" || $0.type == "SPECIFIC") }
+            .filter { !$0.completed && ($0.type == "DEADLINE" || $0.type == "SPECIFIC" || $0.type == "DATE_RANGE") }
             .sorted {
-                let a = $0.deadline ?? $0.specificDate ?? ""
-                let b = $1.deadline ?? $1.specificDate ?? ""
+                let a = $0.deadline ?? $0.specificDate ?? $0.dateRangeStart ?? ""
+                let b = $1.deadline ?? $1.specificDate ?? $1.dateRangeStart ?? ""
                 return a < b
             }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("📋 할 일")
+        VStack(alignment: .leading, spacing: 4) {
+            Text("✅ 할 일")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                .padding(.bottom, 2)
 
             if activeTodos.isEmpty {
-                Text("마감 할 일이 없습니다")
+                Text("할 일이 없습니다")
                     .font(.system(size: 12))
                     .foregroundColor(.gray)
                     .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 8)
             } else {
                 ForEach(Array(activeTodos.prefix(maxItems))) { todo in
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color.blue)
-                            .frame(width: 6, height: 6)
-                        Text(todo.title)
-                            .font(.system(size: 13))
-                            .lineLimit(1)
-                        Spacer()
-                        if let deadline = todo.deadline {
-                            let days = daysUntil(deadline)
-                            Text(days == 0 ? "오늘" : "\(days)일")
-                                .font(.system(size: 11))
-                                .foregroundColor(days <= 3 ? .red : .gray)
-                        }
-                    }
-                    .padding(.vertical, 2)
+                    TodoCardView(todo: todo)
                 }
             }
         }
     }
 }
 
-// MARK: - Budget Summary View
+// MARK: - Account Balance View (matches Android BudgetContent)
 
-struct BudgetSummaryView: View {
+struct AccountBalanceSectionView: View {
     let budgets: [BudgetItem]
+    let accounts: [String]
+    let accountBalances: [String: Int]
 
-    var monthlyIncome: Int {
-        let ym = currentYearMonth()
-        return budgets.filter { $0.date.hasPrefix(ym) && $0.type == "INCOME" }
-            .reduce(0) { $0 + $1.money }
+    struct AccountEntry {
+        let name: String
+        let balance: Int
     }
 
-    var monthlyExpense: Int {
-        let ym = currentYearMonth()
-        return budgets.filter { $0.date.hasPrefix(ym) && $0.type == "EXPENSE" }
-            .reduce(0) { $0 + $1.money }
+    var accountEntries: [AccountEntry] {
+        let defaultAccount = accounts.first ?? "기본"
+        return accounts.map { account in
+            let initial = accountBalances[account] ?? 0
+            var balance = initial
+            for b in budgets {
+                let budgetAccount = b.account ?? defaultAccount
+                guard budgetAccount == account else { continue }
+                if b.type == "INCOME" {
+                    balance += abs(b.money)
+                } else {
+                    balance -= abs(b.money)
+                }
+            }
+            return AccountEntry(name: account, balance: balance)
+        }
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 2) {
-                Text("💰")
-                    .font(.system(size: 11))
-                Text("+\(formatKoreanCurrency(monthlyIncome))")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(red: 0.30, green: 0.69, blue: 0.31))
-            }
-            HStack(spacing: 2) {
-                Text("-\(formatKoreanCurrency(monthlyExpense))")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(red: 0.96, green: 0.26, blue: 0.21))
+        VStack(alignment: .leading, spacing: 4) {
+            Text("💰 통장별 잔액")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                .padding(.bottom, 2)
+
+            if accountEntries.isEmpty {
+                Text("등록된 통장이 없습니다")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(accountEntries, id: \.name) { item in
+                    HStack {
+                        Text(item.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                        Spacer()
+                        Text(formatKoreanCurrency(item.balance))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(item.balance >= 0
+                                ? Color(red: 0.30, green: 0.69, blue: 0.31)
+                                : Color(red: 0.96, green: 0.26, blue: 0.21))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Color.white)
+                    .cornerRadius(10)
+                }
             }
         }
     }
@@ -200,18 +358,29 @@ struct CalendarWidgetView: View {
 
     var maxTodoItems: Int {
         switch family {
-        case .systemLarge: return 8
-        case .systemMedium: return 3
-        default: return 2
+        case .systemLarge: return 5
+        case .systemMedium: return 2
+        default: return 1
         }
     }
 
     var body: some View {
         Link(destination: URL(string: "perfectcalendar://")!) {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 TodoSectionView(todos: entry.todos, maxItems: maxTodoItems)
-                Spacer()
-                BudgetSummaryView(budgets: entry.budgets)
+
+                if family == .systemLarge {
+                    Divider()
+                        .padding(.vertical, 2)
+                }
+
+                AccountBalanceSectionView(
+                    budgets: entry.budgets,
+                    accounts: entry.accounts,
+                    accountBalances: entry.accountBalances
+                )
+
+                Spacer(minLength: 0)
             }
             .padding(4)
         }

@@ -139,12 +139,14 @@ export function computeAccountBalances(
     initialBalances: AccountBalances,
     accounts: string[],
 ): { name: string; balance: number }[] {
+    const defaultAccount = accounts[0] || '기본';
+
     return accounts.map(account => {
         const initial = initialBalances[account] || 0;
         let balance = initial;
 
         for (const b of budgets) {
-            if ((b.account || '기본') !== account) continue;
+            if ((b.account || defaultAccount) !== account) continue;
             if (b.type === 'INCOME') {
                 balance += Math.abs(b.money);
             } else {

@@ -161,6 +161,7 @@ export const saveAccounts = async (accounts: string[]): Promise<void> => {
     try {
         const jsonValue = JSON.stringify(accounts);
         await AsyncStorage.setItem(ACCOUNTS_KEY, jsonValue);
+        syncToWidgetStorage('widget_accounts', jsonValue);
     } catch (e) {
         console.error('통장 저장 실패:', e);
     }
@@ -185,6 +186,7 @@ export const saveAccountBalances = async (balances: AccountBalances): Promise<vo
     try {
         const jsonValue = JSON.stringify(balances);
         await AsyncStorage.setItem(ACCOUNT_BALANCES_KEY, jsonValue);
+        syncToWidgetStorage('widget_account_balances', jsonValue);
     } catch (e) {
         console.error('통장 초기 잔액 저장 실패:', e);
     }

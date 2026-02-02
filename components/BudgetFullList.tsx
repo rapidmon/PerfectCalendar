@@ -1,24 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Modal } from 'react-native';
 import MonthlySummaryCard from './MonthlySummaryCard';
 import MonthlyChartCard from './MonthlyChartCard';
 import SetGoalModal from './SetGoalModal';
 import CategoryManageModal from './CategoryManageModal';
 import AccountManageModal from './AccountManageModal';
-import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
-import {
-    loadBudgets,
-    loadCategories,
-    saveCategories,
-    loadFixedExpenseCategories,
-    saveFixedExpenseCategories,
-    loadMonthlyGoals,
-    saveMonthlyGoals,
-    loadAccounts,
-    saveAccounts,
-    loadAccountBalances,
-    saveAccountBalances,
-} from '../utils/storage';
+import OverallStatsModal from './OverallStatsModal';
+import { AccountBalances } from '../types/budget';
+import { useAppData } from '../contexts/AppDataContext';
 import { computeMonthlyStats, getMultiMonthChartData, computeAccountBalances } from '../utils/budgetAnalytics';
 
 interface BudgetFullListProps {
@@ -26,13 +15,7 @@ interface BudgetFullListProps {
 }
 
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
-    const [budgets, setBudgets] = useState<Budget[]>([]);
-    const [categories, setCategories] = useState<string[]>([]);
-    const [fixedCategories, setFixedCategories] = useState<string[]>([]);
-    const [monthlyGoals, setMonthlyGoals] = useState<MonthlyGoal>({});
-    const [accounts, setAccounts] = useState<string[]>([]);
-    const [accountInitialBalances, setAccountInitialBalances] = useState<AccountBalances>({});
-    const [loading, setLoading] = useState(true);
+    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, store } = useAppData();
 
     const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(selectedDate.getMonth() + 1);
@@ -41,110 +24,76 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     const [goalModalVisible, setGoalModalVisible] = useState(false);
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [accountManageModalVisible, setAccountManageModalVisible] = useState(false);
-
-    useEffect(() => {
-        const load = async () => {
-            const [b, c, fc, mg, acc, ab] = await Promise.all([
-                loadBudgets(),
-                loadCategories(),
-                loadFixedExpenseCategories(),
-                loadMonthlyGoals(),
-                loadAccounts(),
-                loadAccountBalances(),
-            ]);
-            setBudgets(b);
-            setCategories(c);
-            setFixedCategories(fc);
-            setMonthlyGoals(mg);
-            setAccounts(acc);
-            setAccountInitialBalances(ab);
-            setLoading(false);
-        };
-        load();
-    }, []);
-
-    // Reload data when coming back (selectedDate changes may mean new data)
-    useEffect(() => {
-        if (!loading) {
-            Promise.all([
-                loadBudgets(),
-                loadAccounts(),
-                loadAccountBalances(),
-            ]).then(([b, acc, ab]) => {
-                setBudgets(b);
-                setAccounts(acc);
-                setAccountInitialBalances(ab);
-            });
-        }
-    }, [selectedDate, loading]);
+    const [overallStatsVisible, setOverallStatsVisible] = useState(false);
 
     const monthKey = `${viewYear}-${String(viewMonth).padStart(2, '0')}`;
     const monthLabel = `${viewYear}년 ${viewMonth}월`;
 
-    const goToPrevMonth = () => {
+    const goToPrevMonth = useCallback(() => {
         if (viewMonth === 1) {
             setViewYear(y => y - 1);
             setViewMonth(12);
         } else {
             setViewMonth(m => m - 1);
         }
-    };
+    }, [viewMonth]);
 
-    const goToNextMonth = () => {
+    const goToNextMonth = useCallback(() => {
         if (viewMonth === 12) {
             setViewYear(y => y + 1);
             setViewMonth(1);
         } else {
             setViewMonth(m => m + 1);
         }
-    };
+    }, [viewMonth]);
 
     const handleSaveGoal = useCallback((amount: number) => {
-        const updated = { ...monthlyGoals, [monthKey]: amount };
-        setMonthlyGoals(updated);
-        saveMonthlyGoals(updated);
-    }, [monthlyGoals, monthKey]);
+        store.setMonthlyGoal(monthKey, amount);
+    }, [store, monthKey]);
 
     const handleSaveCategories = useCallback((cats: string[], fixed: string[]) => {
-        setCategories(cats);
-        saveCategories(cats);
-        setFixedCategories(fixed);
-        saveFixedExpenseCategories(fixed);
-    }, []);
+        store.saveCategoriesAndFixed(cats, fixed);
+    }, [store]);
 
     const handleSaveAccounts = useCallback((accs: string[], balances: AccountBalances) => {
-        setAccounts(accs);
-        saveAccounts(accs);
-        setAccountInitialBalances(balances);
-        saveAccountBalances(balances);
-    }, []);
+        store.saveAccountsAndBalances(accs, balances);
+    }, [store]);
 
-    const openSettingsItem = (target: 'goal' | 'category' | 'accountManage') => {
+    const openSettingsItem = useCallback((target: 'goal' | 'category' | 'accountManage') => {
         setSettingsMenuVisible(false);
         setTimeout(() => {
             if (target === 'goal') setGoalModalVisible(true);
             else if (target === 'category') setCategoryModalVisible(true);
             else if (target === 'accountManage') setAccountManageModalVisible(true);
         }, 200);
-    };
+    }, []);
 
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="small" color="#4A90E2" />
-            </View>
-        );
-    }
+    // Memoized analytics - recomputed only when dependencies change
+    const stats = useMemo(
+        () => computeMonthlyStats(budgets, viewYear, viewMonth, fixedCategories),
+        [budgets, viewYear, viewMonth, fixedCategories]
+    );
 
-    const stats = computeMonthlyStats(budgets, viewYear, viewMonth, fixedCategories);
-    const chartData = getMultiMonthChartData(budgets, viewYear, viewMonth, 5, fixedCategories);
-    const accountBalanceList = computeAccountBalances(budgets, accountInitialBalances, accounts);
+    const chartData = useMemo(
+        () => getMultiMonthChartData(budgets, viewYear, viewMonth, 6, fixedCategories),
+        [budgets, viewYear, viewMonth, fixedCategories]
+    );
+
+    const accountBalanceList = useMemo(
+        () => computeAccountBalances(budgets, accountBalances, accounts),
+        [budgets, accountBalances, accounts]
+    );
 
     return (
         <View style={styles.container}>
             {/* 월 네비게이터 */}
             <View style={styles.monthNav}>
-                <View style={styles.navSpacer} />
+                <TouchableOpacity
+                    style={styles.overallButton}
+                    onPress={() => setOverallStatsVisible(true)}
+                >
+                    <Text style={styles.overallButtonText}>전체</Text>
+                </TouchableOpacity>
                 <View style={styles.navCenter}>
                     <TouchableOpacity onPress={goToPrevMonth} style={styles.navButton}>
                         <Text style={styles.navButtonText}>◀</Text>
@@ -195,9 +144,15 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
             <AccountManageModal
                 visible={accountManageModalVisible}
                 accounts={accounts}
-                initialBalances={accountInitialBalances}
+                initialBalances={accountBalances}
                 onClose={() => setAccountManageModalVisible(false)}
                 onSave={handleSaveAccounts}
+            />
+
+            <OverallStatsModal
+                visible={overallStatsVisible}
+                budgets={budgets}
+                onClose={() => setOverallStatsVisible(false)}
             />
 
             {/* 설정 메뉴 */}
@@ -254,8 +209,16 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 4,
     },
-    navSpacer: {
-        width: 32,
+    overallButton: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+        backgroundColor: '#f0f0f0',
+    },
+    overallButtonText: {
+        fontSize: 12,
+        color: '#555',
+        fontWeight: '600',
     },
     navCenter: {
         flex: 1,
