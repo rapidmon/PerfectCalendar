@@ -31,7 +31,15 @@ export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps
         
         case 'SPECIFIC':
             return `오늘이다!`;
-        
+
+        case 'DATE_RANGE':
+            if (todo.dateRangeStart && todo.dateRangeEnd) {
+                const s = new Date(todo.dateRangeStart);
+                const e = new Date(todo.dateRangeEnd);
+                return `${s.getMonth() + 1}/${s.getDate()} ~ ${e.getMonth() + 1}/${e.getDate()}`;
+            }
+            return '';
+
         default:
             return '';
         }

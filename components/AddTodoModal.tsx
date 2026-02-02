@@ -7,35 +7,40 @@ interface AddTodoModalProps {
     selectedDate: Date;
     editingTodo?: Todo | null;
     onClose: () => void;
-    onAdd: (title: string, type: TodoType, customDate?: Date) => void;
-    onUpdate?: (id: string, title: string, type: TodoType, customDate?: Date) => void;
+    onAdd: (title: string, type: TodoType, customDate?: Date, endDate?: Date) => void;
+    onUpdate?: (id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => void;
 }
 
 export default function AddTodoModal({ visible, selectedDate, editingTodo, onClose, onAdd, onUpdate }: AddTodoModalProps) {
     const [title, setTitle] = useState('');
     const [selectedType, setSelectedType] = useState<TodoType>('SPECIFIC');
     const [customDate, setCustomDate] = useState<Date>(selectedDate);
+    const [customEndDate, setCustomEndDate] = useState<Date>(selectedDate);
     const [customDay, setCustomDay] = useState<number>(1);
     const [customWeekday, setCustomWeekday] = useState<string>('월');
 
     // 편집 모드일 때 기존 데이터 채우기
     useEffect(() => {
         if (editingTodo) {
-        setTitle(editingTodo.title);
-        setSelectedType(editingTodo.type);
-        
-        // 타입별로 날짜 복원
-        if (editingTodo.type === 'RECURRING' && editingTodo.recurringDay) {
-            setCustomWeekday(editingTodo.recurringDay);
-        } else if (editingTodo.type === 'MONTHLY_RECURRING' && editingTodo.monthlyRecurringDay) {
-            setCustomDay(editingTodo.monthlyRecurringDay);
-        } else if (editingTodo.type === 'DEADLINE' && editingTodo.deadline) {
-            setCustomDate(new Date(editingTodo.deadline));
-        } else if (editingTodo.type === 'SPECIFIC' && editingTodo.specificDate) {
-            setCustomDate(new Date(editingTodo.specificDate));
-        }
+            setTitle(editingTodo.title);
+            setSelectedType(editingTodo.type);
+
+            // 타입별로 날짜 복원
+            if (editingTodo.type === 'RECURRING' && editingTodo.recurringDay) {
+                setCustomWeekday(editingTodo.recurringDay);
+            } else if (editingTodo.type === 'MONTHLY_RECURRING' && editingTodo.monthlyRecurringDay) {
+                setCustomDay(editingTodo.monthlyRecurringDay);
+            } else if (editingTodo.type === 'DEADLINE' && editingTodo.deadline) {
+                setCustomDate(new Date(editingTodo.deadline));
+            } else if (editingTodo.type === 'SPECIFIC' && editingTodo.specificDate) {
+                setCustomDate(new Date(editingTodo.specificDate));
+            } else if (editingTodo.type === 'DATE_RANGE' && editingTodo.dateRangeStart && editingTodo.dateRangeEnd) {
+                setCustomDate(new Date(editingTodo.dateRangeStart));
+                setCustomEndDate(new Date(editingTodo.dateRangeEnd));
+            }
         } else {
             setCustomDate(selectedDate);
+            setCustomEndDate(selectedDate);
             const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][selectedDate.getDay()];
             setCustomWeekday(dayOfWeek);
             setCustomDay(selectedDate.getDate());
@@ -47,6 +52,7 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
         { type: 'MONTHLY_RECURRING', label: '월간 반복' },
         { type: 'DEADLINE', label: '기한' },
         { type: 'SPECIFIC', label: '특정일' },
+        { type: 'DATE_RANGE', label: '연속일정' },
     ];
 
     const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
@@ -62,6 +68,8 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
             return `${customDate.getMonth() + 1}월 ${customDate.getDate()}일까지 완료`;
         case 'SPECIFIC':
             return `${customDate.getMonth() + 1}월 ${customDate.getDate()}일에만 표시`;
+        case 'DATE_RANGE':
+            return `${customDate.getMonth() + 1}월 ${customDate.getDate()}일 ~ ${customEndDate.getMonth() + 1}월 ${customEndDate.getDate()}일`;
         default:
             return '';
         }
@@ -72,28 +80,35 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
         if (editingTodo && onUpdate) {
             // 수정 모드
             let dateToUse: Date | undefined;
-            
+            let endDateToUse: Date | undefined;
+
             if (selectedType === 'DEADLINE' || selectedType === 'SPECIFIC') {
             dateToUse = customDate;
             } else if (selectedType === 'MONTHLY_RECURRING') {
             dateToUse = new Date(customDate.getFullYear(), customDate.getMonth(), customDay);
             } else if (selectedType === 'RECURRING') {
-            // 요일은 날짜로 변환 불필요
             dateToUse = undefined;
+            } else if (selectedType === 'DATE_RANGE') {
+            dateToUse = customDate;
+            endDateToUse = customEndDate;
             }
-            
-            onUpdate(editingTodo.id, title.trim(), selectedType, dateToUse);
+
+            onUpdate(editingTodo.id, title.trim(), selectedType, dateToUse, endDateToUse);
         } else {
             // 추가 모드
             let dateToUse: Date | undefined;
-            
+            let endDateToUse: Date | undefined;
+
             if (selectedType === 'DEADLINE' || selectedType === 'SPECIFIC') {
             dateToUse = customDate;
             } else if (selectedType === 'MONTHLY_RECURRING') {
             dateToUse = new Date(customDate.getFullYear(), customDate.getMonth(), customDay);
+            } else if (selectedType === 'DATE_RANGE') {
+            dateToUse = customDate;
+            endDateToUse = customEndDate;
             }
-            
-            onAdd(title.trim(), selectedType, dateToUse);
+
+            onAdd(title.trim(), selectedType, dateToUse, endDateToUse);
         }
         handleCancel();
         }
@@ -103,6 +118,7 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
         setTitle('');
         setSelectedType('SPECIFIC');
         setCustomDate(selectedDate);
+        setCustomEndDate(selectedDate);
         onClose();
     };
 
@@ -111,6 +127,21 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
         const newDate = new Date(customDate);
         newDate.setDate(customDate.getDate() + days);
         setCustomDate(newDate);
+        // 시작 날짜가 끝 날짜보다 뒤면 끝 날짜를 시작 날짜로 보정
+        if (selectedType === 'DATE_RANGE' && newDate > customEndDate) {
+            setCustomEndDate(new Date(newDate));
+        }
+    };
+
+    const handleEndDateChange = (days: number) => {
+        const newDate = new Date(customEndDate);
+        newDate.setDate(customEndDate.getDate() + days);
+        // 끝 날짜가 시작 날짜보다 이전이면 시작 날짜로 보정
+        if (newDate < customDate) {
+            setCustomEndDate(new Date(customDate));
+        } else {
+            setCustomEndDate(newDate);
+        }
     };
 
     return (
@@ -137,7 +168,7 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
                 />
 
                 {/* 타입 선택 */}
-                <Text style={styles.label}>반복 유형</Text>
+                <Text style={styles.label}>Date 유형</Text>
                 <View style={styles.typeContainer}>
                 {todoTypes.map((item) => (
                     <TouchableOpacity
@@ -191,8 +222,8 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
                 {selectedType === 'MONTHLY_RECURRING' && (
                 <View style={styles.datePickerContainer}>
                     <Text style={styles.label}>날짜 선택 (일)</Text>
-                    <ScrollView 
-                    horizontal 
+                    <ScrollView
+                    horizontal
                     showsHorizontalScrollIndicator={false}
                     style={styles.monthDayScroll}
                     >
@@ -219,7 +250,53 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
                 </View>
                 )}
 
-                {( editingTodo && (selectedType === 'DEADLINE' || selectedType === 'SPECIFIC')) && (
+                {selectedType === 'DATE_RANGE' && (
+                    <View style={styles.datePickerContainer}>
+                        <Text style={styles.label}>시작 날짜</Text>
+                        <View style={styles.dateNavigator}>
+                            <TouchableOpacity
+                                style={styles.dateNavButton}
+                                onPress={() => handleDateChange(-1)}
+                            >
+                                <Text style={styles.dateNavText}>◀</Text>
+                            </TouchableOpacity>
+
+                            <Text style={styles.dateDisplay}>
+                                {customDate.getFullYear()}년 {customDate.getMonth() + 1}월 {customDate.getDate()}일
+                            </Text>
+
+                            <TouchableOpacity
+                                style={styles.dateNavButton}
+                                onPress={() => handleDateChange(1)}
+                            >
+                                <Text style={styles.dateNavText}>▶</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <Text style={[styles.label, { marginTop: 12 }]}>끝나는 날짜</Text>
+                        <View style={styles.dateNavigator}>
+                            <TouchableOpacity
+                                style={styles.dateNavButton}
+                                onPress={() => handleEndDateChange(-1)}
+                            >
+                                <Text style={styles.dateNavText}>◀</Text>
+                            </TouchableOpacity>
+
+                            <Text style={styles.dateDisplay}>
+                                {customEndDate.getFullYear()}년 {customEndDate.getMonth() + 1}월 {customEndDate.getDate()}일
+                            </Text>
+
+                            <TouchableOpacity
+                                style={styles.dateNavButton}
+                                onPress={() => handleEndDateChange(1)}
+                            >
+                                <Text style={styles.dateNavText}>▶</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                )}
+
+                {(selectedType === 'DEADLINE' || selectedType === 'SPECIFIC') && (
                     <View style={styles.datePickerContainer}>
                         <Text style={styles.label}>날짜 선택</Text>
                         <View style={styles.dateNavigator}>
@@ -229,11 +306,11 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
                         >
                             <Text style={styles.dateNavText}>◀</Text>
                         </TouchableOpacity>
-                        
+
                         <Text style={styles.dateDisplay}>
                             {customDate.getFullYear()}년 {customDate.getMonth() + 1}월 {customDate.getDate()}일
                         </Text>
-                        
+
                         <TouchableOpacity
                             style={styles.dateNavButton}
                             onPress={() => handleDateChange(1)}

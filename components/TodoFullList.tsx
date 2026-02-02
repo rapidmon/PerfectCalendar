@@ -57,6 +57,17 @@ function getTodoDateInfo(todo: Todo): { dateKey: string; dateLabel: string; sort
                 };
             }
             break;
+        case 'DATE_RANGE':
+            if (todo.dateRangeStart && todo.dateRangeEnd) {
+                const s = new Date(todo.dateRangeStart);
+                const e = new Date(todo.dateRangeEnd);
+                return {
+                    dateKey: `range-${todo.dateRangeStart}-${todo.dateRangeEnd}`,
+                    dateLabel: `${s.getMonth() + 1}월 ${s.getDate()}일 ~ ${e.getMonth() + 1}월 ${e.getDate()}일`,
+                    sortKey: todo.dateRangeStart,
+                };
+            }
+            break;
     }
     return { dateKey: 'unknown', dateLabel: '기타', sortKey: 'zzz' };
 }
@@ -117,11 +128,17 @@ export default function TodoFullList({ selectedDate }: TodoFullListProps) {
         }
     };
 
-    const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date) => {
-        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: new Date().toISOString().split('T')[0] };
+    const formatLocalDate = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
+    const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
+        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: formatLocalDate(new Date()) };
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
         switch (type) {
             case 'RECURRING':
@@ -131,19 +148,22 @@ export default function TodoFullList({ selectedDate }: TodoFullListProps) {
                 newTodo.monthlyRecurringDay = dateToUse.getDate();
                 break;
             case 'DEADLINE':
-                newTodo.deadline = formatDate(dateToUse);
+                newTodo.deadline = formatLocalDate(dateToUse);
                 break;
             case 'SPECIFIC':
-                newTodo.specificDate = formatDate(dateToUse);
+                newTodo.specificDate = formatLocalDate(dateToUse);
+                break;
+            case 'DATE_RANGE':
+                newTodo.dateRangeStart = formatLocalDate(dateToUse);
+                newTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
                 break;
         }
         setTodos(prev => [...prev, newTodo]);
     };
 
-    const handleUpdateTodo = (id: string, title: string, type: TodoType, customDate?: Date) => {
+    const handleUpdateTodo = (id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
         setTodos(prev => prev.map(todo => {
             if (todo.id === id) {
@@ -153,12 +173,18 @@ export default function TodoFullList({ selectedDate }: TodoFullListProps) {
                     monthlyRecurringDay: undefined,
                     deadline: undefined,
                     specificDate: undefined,
+                    dateRangeStart: undefined,
+                    dateRangeEnd: undefined,
                 };
                 switch (type) {
                     case 'RECURRING': updated.recurringDay = dayOfWeek; break;
                     case 'MONTHLY_RECURRING': updated.monthlyRecurringDay = dateToUse.getDate(); break;
-                    case 'DEADLINE': updated.deadline = formatDate(dateToUse); break;
-                    case 'SPECIFIC': updated.specificDate = formatDate(dateToUse); break;
+                    case 'DEADLINE': updated.deadline = formatLocalDate(dateToUse); break;
+                    case 'SPECIFIC': updated.specificDate = formatLocalDate(dateToUse); break;
+                    case 'DATE_RANGE':
+                        updated.dateRangeStart = formatLocalDate(dateToUse);
+                        updated.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
+                        break;
                 }
                 return updated;
             }
@@ -261,6 +287,7 @@ function getTypeLabel(type: TodoType): string {
         case 'MONTHLY_RECURRING': return '월간';
         case 'DEADLINE': return '기한';
         case 'SPECIFIC': return '특정일';
+        case 'DATE_RANGE': return '범위';
     }
 }
 

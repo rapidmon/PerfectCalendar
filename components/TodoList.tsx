@@ -72,36 +72,44 @@ export default function TodoList({ selectedDate }: TodoListProps) {
         }
     };
 
-    const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date) => {
-        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: new Date().toISOString().split('T')[0] };
+    const formatLocalDate = (date: Date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
+    const handleAddTodoConfirm = (title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
+        const newTodo: Todo = { id: Date.now().toString(), title, type, completed: false, createdAt: formatLocalDate(new Date()) };
 
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
         switch (type) {
         case 'RECURRING':
-            // customWeekday가 있다면 사용 (모달에서 처리됨)
             newTodo.recurringDay = dayOfWeek;
             break;
         case 'MONTHLY_RECURRING':
             newTodo.monthlyRecurringDay = dateToUse.getDate();
             break;
         case 'DEADLINE':
-            newTodo.deadline = formatDate(dateToUse);
+            newTodo.deadline = formatLocalDate(dateToUse);
             break;
         case 'SPECIFIC':
-            newTodo.specificDate = formatDate(dateToUse);
+            newTodo.specificDate = formatLocalDate(dateToUse);
+            break;
+        case 'DATE_RANGE':
+            newTodo.dateRangeStart = formatLocalDate(dateToUse);
+            newTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
             break;
         }
 
         setTodos([...todos, newTodo]);
     };
 
-    const handleUpdateTodo = (id: string, title: string, type: TodoType, customDate?: Date) => {
+    const handleUpdateTodo = (id: string, title: string, type: TodoType, customDate?: Date, endDate?: Date) => {
         const dateToUse = customDate || selectedDate;
         const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][dateToUse.getDay()];
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
         setTodos(todos.map(todo => {
         if (todo.id === id) {
@@ -113,6 +121,8 @@ export default function TodoList({ selectedDate }: TodoListProps) {
                 monthlyRecurringDay: undefined,
                 deadline: undefined,
                 specificDate: undefined,
+                dateRangeStart: undefined,
+                dateRangeEnd: undefined,
             };
 
             switch (type) {
@@ -123,10 +133,14 @@ export default function TodoList({ selectedDate }: TodoListProps) {
                 updatedTodo.monthlyRecurringDay = dateToUse.getDate();
                 break;
             case 'DEADLINE':
-                updatedTodo.deadline = formatDate(dateToUse);
+                updatedTodo.deadline = formatLocalDate(dateToUse);
                 break;
             case 'SPECIFIC':
-                updatedTodo.specificDate = formatDate(dateToUse);
+                updatedTodo.specificDate = formatLocalDate(dateToUse);
+                break;
+            case 'DATE_RANGE':
+                updatedTodo.dateRangeStart = formatLocalDate(dateToUse);
+                updatedTodo.dateRangeEnd = endDate ? formatLocalDate(endDate) : formatLocalDate(dateToUse);
                 break;
             }
 
@@ -166,8 +180,19 @@ export default function TodoList({ selectedDate }: TodoListProps) {
             specificDate.setHours(0, 0, 0, 0);
             const selected = new Date(selectedDate);
             selected.setHours(0, 0, 0, 0);
-            
+
             return selected.getTime() === specificDate.getTime();
+        }
+
+        if (todo.type === 'DATE_RANGE' && todo.dateRangeStart && todo.dateRangeEnd) {
+            const rangeStart = new Date(todo.dateRangeStart);
+            rangeStart.setHours(0, 0, 0, 0);
+            const rangeEnd = new Date(todo.dateRangeEnd);
+            rangeEnd.setHours(0, 0, 0, 0);
+            const selected = new Date(selectedDate);
+            selected.setHours(0, 0, 0, 0);
+
+            return selected >= rangeStart && selected <= rangeEnd;
         }
 
         return false;

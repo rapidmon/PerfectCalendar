@@ -124,40 +124,42 @@ export default function CalendarView({ selectedDate, onDateChange }: CalendarVie
             </View>
 
             {/* 날짜 그리드 */}
-            {calendarRows.map((row, rowIdx) => (
-                <View key={rowIdx} style={styles.dayRow}>
-                    {row.map((day, colIdx) => {
-                        if (day === null) {
-                            return <View key={colIdx} style={styles.dayCell} />;
-                        }
-                        const date = new Date(currentYear, currentMonth - 1, day);
-                        const selected = isSameDay(date, selectedDate);
-                        const today = isToday(currentYear, currentMonth, day);
+            <View>
+                {calendarRows.map((row, rowIdx) => (
+                    <View key={rowIdx} style={styles.dayRow}>
+                        {row.map((day, colIdx) => {
+                            if (day === null) {
+                                return <View key={colIdx} style={styles.dayCell} />;
+                            }
+                            const date = new Date(currentYear, currentMonth - 1, day);
+                            const selected = isSameDay(date, selectedDate);
+                            const today = isToday(currentYear, currentMonth, day);
 
-                        return (
-                            <TouchableOpacity
-                                key={colIdx}
-                                style={styles.dayCell}
-                                onPress={() => onDateChange(date)}
-                                activeOpacity={0.5}
-                            >
-                                <View style={[
-                                    styles.dayInner,
-                                    selected && styles.daySelected,
-                                ]}>
-                                    <Text style={[
-                                        styles.dayText,
-                                        colIdx === 0 && styles.sundayText,
-                                        colIdx === 6 && styles.saturdayText,
-                                        today && !selected && styles.todayText,
-                                        selected && styles.daySelectedText,
-                                    ]}>{day}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </View>
-            ))}
+                            return (
+                                <TouchableOpacity
+                                    key={colIdx}
+                                    style={styles.dayCell}
+                                    onPress={() => onDateChange(date)}
+                                    activeOpacity={0.6}
+                                >
+                                    <View style={[
+                                        styles.dayInner,
+                                        selected && styles.daySelected,
+                                    ]}>
+                                        <Text style={[
+                                            styles.dayText,
+                                            colIdx === 0 && styles.sundayText,
+                                            colIdx === 6 && styles.saturdayText,
+                                            today && !selected && styles.todayText,
+                                            selected && styles.daySelectedText,
+                                        ]}>{day}</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                ))}
+            </View>
 
             {/* 연/월 선택 모달 */}
             <PickerModal

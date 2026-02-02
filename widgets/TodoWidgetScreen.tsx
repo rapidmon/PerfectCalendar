@@ -11,6 +11,7 @@ function getBlockHexColor(color: BlockColor): `#${string}` {
     switch (color) {
         case 'green': return '#4CAF50';
         case 'orange': return '#FF9800';
+        case 'red': return '#F44336';
         case 'gray': return '#E0E0E0';
     }
 }
@@ -25,7 +26,7 @@ function TodoCard({ todo }: { todo: Todo }) {
                 backgroundColor: '#FFFFFF',
                 borderRadius: 12,
                 padding: 12,
-                marginBottom: 8,
+                marginBottom: 10,
                 width: 'match_parent',
             }}
         >
@@ -34,7 +35,7 @@ function TodoCard({ todo }: { todo: Todo }) {
                 style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    marginBottom: 8,
+                    marginBottom: progress.hasProgress ? 8 : 0,
                     width: 'match_parent',
                 }}
             >
@@ -61,8 +62,8 @@ function TodoCard({ todo }: { todo: Todo }) {
                     }}
                 >
                     <TextWidget
-                        text="✓"
-                        style={{ fontSize: 12, color: '#FFFFFF' }}
+                        text="완료"
+                        style={{ fontSize: 11, color: '#FFFFFF' }}
                     />
                 </FlexWidget>
                 <FlexWidget
@@ -77,8 +78,8 @@ function TodoCard({ todo }: { todo: Todo }) {
                     }}
                 >
                     <TextWidget
-                        text="✕"
-                        style={{ fontSize: 12, color: '#FFFFFF' }}
+                        text="제거"
+                        style={{ fontSize: 11, color: '#FFFFFF' }}
                     />
                 </FlexWidget>
             </FlexWidget>
@@ -97,7 +98,7 @@ function TodoCard({ todo }: { todo: Todo }) {
                             key={idx}
                             style={{
                                 flex: 1,
-                                height: 6,
+                                height: 8,
                                 backgroundColor: getBlockHexColor(block.color),
                                 borderRadius: 2,
                                 marginRight: idx < 19 ? 1 : 0,
@@ -110,7 +111,7 @@ function TodoCard({ todo }: { todo: Todo }) {
             {/* 마감일 정보 */}
             {progress.hasProgress && (
                 <TextWidget
-                    text={progress.daysLeft === 0 ? '오늘 마감' : `${progress.daysLeft}일 뒤 마감`}
+                    text={progress.daysLeft === 0 ? `오늘 ${progress.label}` : `${progress.daysLeft}일 뒤 ${progress.label}`}
                     style={{
                         fontSize: 11,
                         color: progress.daysLeft <= 3 ? '#F44336' : '#999999',
@@ -123,10 +124,10 @@ function TodoCard({ todo }: { todo: Todo }) {
 
 export default function TodoWidgetScreen({ todos }: TodoWidgetScreenProps) {
     const filteredTodos = todos
-        .filter(t => !t.completed && (t.type === 'DEADLINE' || t.type === 'SPECIFIC'))
+        .filter(t => !t.completed && (t.type === 'DEADLINE' || t.type === 'SPECIFIC' || t.type === 'DATE_RANGE'))
         .sort((a, b) => {
-            const dateA = a.deadline || a.specificDate || '';
-            const dateB = b.deadline || b.specificDate || '';
+            const dateA = a.deadline || a.specificDate || a.dateRangeStart || '';
+            const dateB = b.deadline || b.specificDate || b.dateRangeStart || '';
             return dateA.localeCompare(dateB);
         });
 
@@ -151,35 +152,37 @@ export default function TodoWidgetScreen({ todos }: TodoWidgetScreenProps) {
                 }}
             />
 
-            {filteredTodos.length === 0 ? (
-                <FlexWidget
-                    style={{
-                        flex: 1,
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        width: 'match_parent',
-                    }}
-                >
-                    <TextWidget
-                        text="마감 할 일이 없습니다"
+            <FlexWidget style={{ flex: 1, width: 'match_parent' }}>
+                {filteredTodos.length === 0 ? (
+                    <FlexWidget
                         style={{
-                            fontSize: 13,
-                            color: '#999999',
+                            flex: 1,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            width: 'match_parent',
                         }}
-                    />
-                </FlexWidget>
-            ) : (
-                <ListWidget
-                    style={{
-                        width: 'match_parent',
-                        height: 'match_parent',
-                    }}
-                >
-                    {filteredTodos.map(todo => (
-                        <TodoCard key={todo.id} todo={todo} />
-                    ))}
-                </ListWidget>
-            )}
+                    >
+                        <TextWidget
+                            text="할 일이 없습니다"
+                            style={{
+                                fontSize: 13,
+                                color: '#999999',
+                            }}
+                        />
+                    </FlexWidget>
+                ) : (
+                    <ListWidget
+                        style={{
+                            width: 'match_parent',
+                            flex: 1,
+                        }}
+                    >
+                        {filteredTodos.map(todo => (
+                            <TodoCard key={todo.id} todo={todo} />
+                        ))}
+                    </ListWidget>
+                )}
+            </FlexWidget>
 
             <FlexWidget
                 clickAction="OPEN_APP"

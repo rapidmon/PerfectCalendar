@@ -1,6 +1,6 @@
 import { Todo } from '../types/todo';
 
-export type BlockColor = 'green' | 'orange' | 'gray';
+export type BlockColor = 'green' | 'orange' | 'red' | 'gray';
 
 export interface ProgressBlock {
     color: BlockColor;
@@ -11,45 +11,69 @@ export interface TodoProgress {
     blocks: ProgressBlock[];
     daysLeft: number;
     totalDays: number;
+    label: string;
 }
 
 const TOTAL_BLOCKS = 20;
 
 export function calculateTodoProgress(todo: Todo): TodoProgress {
-    if (todo.type === 'RECURRING' || todo.type === 'MONTHLY_RECURRING') {
-        return { hasProgress: false, blocks: [], daysLeft: 0, totalDays: 0 };
-    }
-
-    const deadlineStr = todo.type === 'DEADLINE' ? todo.deadline : todo.specificDate;
-    if (!deadlineStr) {
-        return { hasProgress: false, blocks: [], daysLeft: 0, totalDays: 0 };
-    }
-
-    const createdAtStr = todo.createdAt || new Date(parseInt(todo.id)).toISOString().split('T')[0];
-
-    const created = new Date(createdAtStr);
-    created.setHours(0, 0, 0, 0);
-    const deadline = new Date(deadlineStr);
-    deadline.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const totalDays = Math.max(1, Math.round((deadline.getTime() - created.getTime()) / (1000 * 60 * 60 * 24)));
-    const elapsed = Math.round((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-    const daysLeft = Math.max(0, Math.round((deadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+    let targetDate: Date | null = null;
+    let label = '';
 
-    const ratio = Math.min(1, Math.max(0, elapsed / totalDays));
-    const filledBlocks = Math.round(ratio * TOTAL_BLOCKS);
-    const isUrgent = ratio >= 0.8;
-
-    const blocks: ProgressBlock[] = [];
-    for (let i = 0; i < TOTAL_BLOCKS; i++) {
-        if (i < filledBlocks) {
-            blocks.push({ color: isUrgent ? 'orange' : 'green' });
-        } else {
-            blocks.push({ color: 'gray' });
-        }
+    switch (todo.type) {
+        case 'DEADLINE':
+            if (todo.deadline) {
+                targetDate = new Date(todo.deadline);
+                label = '마감';
+            }
+            break;
+        case 'SPECIFIC':
+            if (todo.specificDate) {
+                targetDate = new Date(todo.specificDate);
+                label = '당일';
+            }
+            break;
+        case 'DATE_RANGE':
+            if (todo.dateRangeStart && todo.dateRangeEnd) {
+                const start = new Date(todo.dateRangeStart);
+                start.setHours(0, 0, 0, 0);
+                if (today.getTime() < start.getTime()) {
+                    targetDate = start;
+                    label = '시작';
+                } else {
+                    targetDate = new Date(todo.dateRangeEnd);
+                    label = '종료';
+                }
+            }
+            break;
+        default:
+            return { hasProgress: false, blocks: [], daysLeft: 0, totalDays: 0, label: '' };
     }
 
-    return { hasProgress: true, blocks, daysLeft, totalDays };
+    if (!targetDate) {
+        return { hasProgress: false, blocks: [], daysLeft: 0, totalDays: 0, label: '' };
+    }
+
+    targetDate.setHours(0, 0, 0, 0);
+    const daysLeft = Math.max(0, Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)));
+
+    let color: BlockColor;
+    if (daysLeft <= 1) {
+        color = 'red';
+    } else if (daysLeft <= 5) {
+        color = 'orange';
+    } else {
+        color = 'green';
+    }
+
+    const filledBlocks = Math.min(daysLeft, TOTAL_BLOCKS);
+    const blocks: ProgressBlock[] = [];
+    for (let i = 0; i < TOTAL_BLOCKS; i++) {
+        blocks.push({ color: i < filledBlocks ? color : 'gray' });
+    }
+
+    return { hasProgress: true, blocks, daysLeft, totalDays: daysLeft, label };
 }
