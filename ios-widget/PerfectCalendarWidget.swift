@@ -58,6 +58,10 @@ struct DataProvider {
     static func loadAccountBalances() -> [String: Int] {
         loadJSON("widget_account_balances") ?? [:]
     }
+
+    static func loadMonthlyGoals() -> [String: Int] {
+        loadJSON("widget_monthly_goals") ?? [:]
+    }
 }
 
 // MARK: - Timeline
@@ -68,11 +72,12 @@ struct CalendarEntry: TimelineEntry {
     let budgets: [BudgetItem]
     let accounts: [String]
     let accountBalances: [String: Int]
+    let monthlyGoals: [String: Int]
 }
 
 struct CalendarTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> CalendarEntry {
-        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], accountBalances: [:])
+        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], accountBalances: [:], monthlyGoals: [:])
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CalendarEntry) -> Void) {
@@ -91,7 +96,8 @@ struct CalendarTimelineProvider: TimelineProvider {
             todos: DataProvider.loadTodos(),
             budgets: DataProvider.loadBudgets(),
             accounts: DataProvider.loadAccounts(),
-            accountBalances: DataProvider.loadAccountBalances()
+            accountBalances: DataProvider.loadAccountBalances(),
+            monthlyGoals: DataProvider.loadMonthlyGoals()
         )
     }
 }
@@ -290,6 +296,7 @@ struct AccountBalanceSectionView: View {
     let budgets: [BudgetItem]
     let accounts: [String]
     let accountBalances: [String: Int]
+    let monthlyGoals: [String: Int]
 
     struct AccountEntry {
         let name: String
@@ -314,8 +321,40 @@ struct AccountBalanceSectionView: View {
         }
     }
 
+    var goalRemaining: Int? {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        let yearMonth = formatter.string(from: Date())
+        guard let goal = monthlyGoals[yearMonth], goal > 0 else { return nil }
+        let monthPrefix = yearMonth + "-"
+        let expense = budgets
+            .filter { $0.type == "EXPENSE" && $0.date.hasPrefix(monthPrefix) }
+            .reduce(0) { $0 + abs($1.money) }
+        return goal - expense
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            if let remaining = goalRemaining {
+                HStack {
+                    Text("목표 잔여")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.gray)
+                    Spacer()
+                    Text(formatKoreanCurrency(remaining))
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(remaining >= 0
+                            ? Color(red: 0.22, green: 0.56, blue: 0.24)
+                            : Color(red: 0.83, green: 0.18, blue: 0.18))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(remaining >= 0
+                    ? Color(red: 0.91, green: 0.96, blue: 0.91)
+                    : Color(red: 1.0, green: 0.92, blue: 0.93))
+                .cornerRadius(10)
+            }
+
             Text("💰 통장별 잔액")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
@@ -377,7 +416,8 @@ struct CalendarWidgetView: View {
                 AccountBalanceSectionView(
                     budgets: entry.budgets,
                     accounts: entry.accounts,
-                    accountBalances: entry.accountBalances
+                    accountBalances: entry.accountBalances,
+                    monthlyGoals: entry.monthlyGoals
                 )
 
                 Spacer(minLength: 0)

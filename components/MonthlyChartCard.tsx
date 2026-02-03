@@ -46,8 +46,82 @@ export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
         <canvas id="chart"></canvas>
     </div>
     <script>
+        const hoverTooltipPlugin = {
+            id: 'hoverTooltip',
+            _activeItems: null,
+            _touching: false,
+            afterEvent(chart, args) {
+                const evt = args.event;
+                if (evt.type === 'pointerdown' || evt.type === 'pointermove' || evt.type === 'mousemove') {
+                    this._touching = true;
+                    const elements = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, false);
+                    if (elements.length > 0) {
+                        this._activeItems = elements;
+                        chart.draw();
+                    }
+                } else if (evt.type === 'pointerup' || evt.type === 'pointerout' || evt.type === 'mouseout') {
+                    this._touching = false;
+                    this._activeItems = null;
+                    chart.draw();
+                }
+            },
+            afterDraw(chart) {
+                if (!this._touching || !this._activeItems || this._activeItems.length === 0) return;
+                const ctx = chart.ctx;
+                const items = this._activeItems;
+                const dataIndex = items[0].index;
+
+                const lines = [];
+                chart.data.datasets.forEach((ds, i) => {
+                    const value = ds.data[dataIndex];
+                    if (value == null) return;
+                    const label = ds.label || '';
+                    const color = ds.borderColor || ds.backgroundColor;
+                    let text;
+                    if (ds.yAxisID === 'y1') {
+                        text = label + ': ' + Number(value).toFixed(1) + '%';
+                    } else {
+                        text = label + ': ' + Number(value).toLocaleString('ko-KR') + '원';
+                    }
+                    lines.push({ text, color });
+                });
+                if (lines.length === 0) return;
+
+                ctx.save();
+                ctx.font = '11px sans-serif';
+                const padding = 8;
+                const lineHeight = 16;
+                const maxWidth = Math.max(...lines.map(l => ctx.measureText(l.text).width));
+                const boxW = maxWidth + padding * 2 + 12;
+                const boxH = lines.length * lineHeight + padding * 2;
+
+                let x = items[0].element.x;
+                let y = 8;
+                if (x + boxW / 2 > chart.width) x = chart.width - boxW - 4;
+                else if (x - boxW / 2 < 0) x = 4;
+                else x = x - boxW / 2;
+
+                ctx.fillStyle = 'rgba(0,0,0,0.82)';
+                ctx.beginPath();
+                ctx.roundRect(x, y, boxW, boxH, 6);
+                ctx.fill();
+
+                lines.forEach((line, i) => {
+                    const ly = y + padding + i * lineHeight + 12;
+                    ctx.fillStyle = line.color;
+                    ctx.beginPath();
+                    ctx.arc(x + padding + 4, ly - 4, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(line.text, x + padding + 12, ly);
+                });
+                ctx.restore();
+            }
+        };
+
         const ctx = document.getElementById('chart').getContext('2d');
         new Chart(ctx, {
+            plugins: [hoverTooltipPlugin],
             type: 'bar',
             data: {
                 labels: ${JSON.stringify(labels)},
@@ -104,6 +178,7 @@ export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                events: ['pointerdown', 'pointermove', 'pointerup', 'pointerout'],
                 interaction: {
                     mode: 'index',
                     intersect: false,
@@ -111,17 +186,9 @@ export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.dataset.label || '';
-                                const value = context.parsed.y;
-                                if (context.dataset.yAxisID === 'y1') {
-                                    return label + ': ' + value.toFixed(1) + '%';
-                                }
-                                return label + ': ' + value.toLocaleString('ko-KR') + '원';
-                            }
-                        }
-                    }
+                        enabled: false,
+                    },
+                    hoverTooltip: {},
                 },
                 scales: {
                     x: {

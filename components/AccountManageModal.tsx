@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { AccountBalances } from '../types/budget';
 
+const ACCOUNT_COLORS = [
+    '#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C',
+    '#1ABC9C', '#F39C12', '#3498DB', '#D35400', '#2ECC71',
+];
+
 interface AccountManageModalProps {
     visible: boolean;
     accounts: string[];
@@ -135,13 +140,18 @@ export default function AccountManageModal({
                     </View>
 
                     <ScrollView style={styles.list}>
-                        {list.map((acc, index) => (
+                        {list.map((acc, index) => {
+                            const color = ACCOUNT_COLORS[index % ACCOUNT_COLORS.length];
+                            return (
                             <View key={`${index}-${acc}`} style={styles.itemRow}>
+                                <View style={[styles.numberBadge, { backgroundColor: color }]}>
+                                    <Text style={styles.numberBadgeText}>{index + 1}</Text>
+                                </View>
                                 <View style={styles.itemInfo}>
                                     {editingIndex === index ? (
                                         <View style={styles.editRow}>
                                             <TextInput
-                                                style={styles.editInput}
+                                                style={[styles.editInput, { borderColor: color }]}
                                                 value={editingName}
                                                 onChangeText={setEditingName}
                                                 onSubmitEditing={confirmEdit}
@@ -175,7 +185,8 @@ export default function AccountManageModal({
                                     <Text style={styles.deleteText}>삭제</Text>
                                 </TouchableOpacity>
                             </View>
-                        ))}
+                        );
+                        })}
                         {list.length === 0 && (
                             <Text style={styles.emptyText}>통장이 없습니다</Text>
                         )}
@@ -252,6 +263,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+    },
+    numberBadge: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 10,
+    },
+    numberBadgeText: {
+        color: '#fff',
+        fontSize: 11,
+        fontWeight: '700',
     },
     itemInfo: {
         flex: 1,

@@ -99,6 +99,7 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
                         <BudgetItem
                             key={budget.id}
                             budget={budget}
+                            accounts={accounts}
                             onPress={() => handleBudgetPress(budget)}
                         />
                     ))

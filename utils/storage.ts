@@ -137,6 +137,7 @@ export const saveMonthlyGoals = async (goals: MonthlyGoal): Promise<void> => {
     try {
         const jsonValue = JSON.stringify(goals);
         await AsyncStorage.setItem(MONTHLY_GOALS_KEY, jsonValue);
+        syncToWidgetStorage('widget_monthly_goals', jsonValue);
     } catch (e) {
         console.error('월별 목표 저장 실패:', e);
     }

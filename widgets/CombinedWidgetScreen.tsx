@@ -1,7 +1,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ListWidget } from 'react-native-android-widget';
 import { Todo } from '../types/todo';
-import { Budget, AccountBalances } from '../types/budget';
+import { Budget, AccountBalances, MonthlyGoal } from '../types/budget';
 import { calculateTodoProgress, BlockColor } from '../utils/todoProgress';
 
 export type WidgetTab = 'todo' | 'budget';
@@ -12,6 +12,7 @@ interface CombinedWidgetScreenProps {
     activeTab: WidgetTab;
     accounts: string[];
     accountInitialBalances: AccountBalances;
+    monthlyGoals: MonthlyGoal;
 }
 
 // ── 할 일 콘텐츠 ──
@@ -214,10 +215,11 @@ function AccountCard({ name, balance }: { name: string; balance: number }) {
     );
 }
 
-function BudgetContent({ budgets, accounts, accountInitialBalances }: {
+function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals }: {
     budgets: Budget[];
     accounts: string[];
     accountInitialBalances: AccountBalances;
+    monthlyGoals: MonthlyGoal;
 }) {
     // 앱과 동일한 방식으로 통장별 잔액 계산
     const accountEntries = accounts.map(account => {
@@ -234,6 +236,16 @@ function BudgetContent({ budgets, accounts, accountInitialBalances }: {
         return { name: account, balance };
     });
 
+    // 이번 달 목표 잔여 금액 계산
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const monthlyGoal = monthlyGoals[yearMonth] || 0;
+    const monthPrefix = `${yearMonth}-`;
+    const monthlyExpense = budgets
+        .filter(b => b.type === 'EXPENSE' && b.date.startsWith(monthPrefix))
+        .reduce((sum, b) => sum + Math.abs(b.money), 0);
+    const remaining = monthlyGoal - monthlyExpense;
+
     return (
         <FlexWidget
             style={{
@@ -242,6 +254,34 @@ function BudgetContent({ budgets, accounts, accountInitialBalances }: {
                 width: 'match_parent',
             }}
         >
+            {monthlyGoal > 0 && (
+                <FlexWidget
+                    style={{
+                        flexDirection: 'row',
+                        backgroundColor: remaining >= 0 ? '#E8F5E9' : '#FFEBEE',
+                        borderRadius: 10,
+                        padding: 10,
+                        marginBottom: 8,
+                        width: 'match_parent',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                    }}
+                >
+                    <TextWidget
+                        text="목표 잔여"
+                        style={{ fontSize: 12, color: '#666666', fontWeight: 'bold' }}
+                    />
+                    <TextWidget
+                        text={formatKoreanCurrency(remaining)}
+                        style={{
+                            fontSize: 14,
+                            color: remaining >= 0 ? '#388E3C' : '#D32F2F',
+                            fontWeight: 'bold',
+                        }}
+                    />
+                </FlexWidget>
+            )}
+
             <TextWidget
                 text="통장별 잔액"
                 style={{
@@ -287,7 +327,7 @@ function BudgetContent({ budgets, accounts, accountInitialBalances }: {
 
 // ── 통합 위젯 ──
 
-export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, accountInitialBalances }: CombinedWidgetScreenProps) {
+export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, accountInitialBalances, monthlyGoals }: CombinedWidgetScreenProps) {
     return (
         <FlexWidget
             style={{
@@ -355,7 +395,7 @@ export default function CombinedWidgetScreen({ todos, budgets, activeTab, accoun
             {/* 콘텐츠 */}
             {activeTab === 'todo'
                 ? <TodoContent todos={todos} />
-                : <BudgetContent budgets={budgets} accounts={accounts} accountInitialBalances={accountInitialBalances} />
+                : <BudgetContent budgets={budgets} accounts={accounts} accountInitialBalances={accountInitialBalances} monthlyGoals={monthlyGoals} />
             }
         </FlexWidget>
     );
