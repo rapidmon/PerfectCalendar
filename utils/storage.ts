@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { Todo } from '../types/todo';
 import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
+import { Investment } from '../types/investment';
+import { Savings } from '../types/savings';
 
 const IOS_APP_GROUP = 'group.com.perfectcalendar.app';
 
@@ -24,6 +26,8 @@ const MONTHLY_GOALS_KEY = '@monthly_goals';
 const ACCOUNTS_KEY = '@accounts';
 const ACCOUNT_BALANCES_KEY = '@account_balances';
 const ONBOARDING_COMPLETE_KEY = '@onboarding_complete';
+const INVESTMENTS_KEY = '@investments';
+const SAVINGS_KEY = '@savings';
 
 const DEFAULT_ACCOUNTS = ['기본'];
 
@@ -224,6 +228,54 @@ export const loadOnboardingComplete = async (): Promise<boolean> => {
     } catch (e) {
         console.error('온보딩 완료 불러오기 실패:', e);
         return false;
+    }
+};
+
+// 투자 저장
+export const saveInvestments = async (investments: Investment[]): Promise<void> => {
+    try {
+        const jsonValue = JSON.stringify(investments);
+        await AsyncStorage.setItem(INVESTMENTS_KEY, jsonValue);
+    } catch (e) {
+        console.error('투자 저장 실패:', e);
+    }
+};
+
+// 투자 불러오기
+export const loadInvestments = async (): Promise<Investment[]> => {
+    try {
+        const jsonValue = await AsyncStorage.getItem(INVESTMENTS_KEY);
+        if (jsonValue != null) {
+            return JSON.parse(jsonValue);
+        }
+        return [];
+    } catch (e) {
+        console.error('투자 불러오기 실패:', e);
+        return [];
+    }
+};
+
+// 적금 저장
+export const saveSavings = async (savings: Savings[]): Promise<void> => {
+    try {
+        const jsonValue = JSON.stringify(savings);
+        await AsyncStorage.setItem(SAVINGS_KEY, jsonValue);
+    } catch (e) {
+        console.error('적금 저장 실패:', e);
+    }
+};
+
+// 적금 불러오기
+export const loadSavings = async (): Promise<Savings[]> => {
+    try {
+        const jsonValue = await AsyncStorage.getItem(SAVINGS_KEY);
+        if (jsonValue != null) {
+            return JSON.parse(jsonValue);
+        }
+        return [];
+    } catch (e) {
+        console.error('적금 불러오기 실패:', e);
+        return [];
     }
 };
 

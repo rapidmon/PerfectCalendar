@@ -5,6 +5,12 @@ export const formatMoney = (amount: number): string => {
     return `${sign}${formatted}원`;
 };
 
+export const formatMoneyNoSign = (amount: number): string => {
+    const absAmount = Math.abs(amount);
+    const formatted = absAmount.toLocaleString('ko-KR');
+    return `${formatted}원`;
+};
+
 export const formatDateKorean = (date: Date): string => {
     const month = date.getMonth() + 1;
     const day = date.getDate();

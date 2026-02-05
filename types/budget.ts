@@ -8,6 +8,8 @@ export interface Budget {
     type: BudgetType;
     category: string;
     account?: string;
+    savingsId?: string;      // 적금 자동납입인 경우 적금 ID
+    savingsPaymentDate?: string;  // 적금 납입 해당 월 (YYYY-MM)
 }
 
 export interface MonthlyGoal {

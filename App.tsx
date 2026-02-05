@@ -7,11 +7,13 @@ import BudgetList from './components/BudgetList';
 import TodoFullList from './components/TodoFullList';
 import BudgetFullList from './components/BudgetFullList';
 import OnboardingScreen from './components/OnboardingScreen';
+import TogetherScreen from './components/TogetherScreen';
+import InvestmentScreen from './components/InvestmentScreen';
 import { AppDataProvider, useAppData } from './contexts/AppDataContext';
 import { useState, useEffect } from 'react';
 import { loadOnboardingComplete } from './utils/storage';
 
-type TabType = 'home' | 'todo' | 'budget';
+type TabType = 'investment' | 'home' | 'todo' | 'budget' | 'together';
 
 export default function App() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
@@ -67,6 +69,8 @@ function AppContent() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'investment':
+        return <InvestmentScreen />;
       case 'home':
         return (
           <>
@@ -90,6 +94,8 @@ function AppContent() {
         return <TodoFullList selectedDate={selectedDate} />;
       case 'budget':
         return <BudgetFullList selectedDate={selectedDate} />;
+      case 'together':
+        return <TogetherScreen />;
     }
   };
 
@@ -100,6 +106,13 @@ function AppContent() {
       </View>
 
       <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setActiveTab('investment')}
+        >
+          <Text style={[styles.tabIcon, activeTab === 'investment' && styles.tabIconActive]}>📈</Text>
+          <Text style={[styles.tabLabel, activeTab === 'investment' && styles.tabLabelActive]}>투자</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.tabItem}
           onPress={() => setActiveTab('todo')}
@@ -120,6 +133,13 @@ function AppContent() {
         >
           <Text style={[styles.tabIcon, activeTab === 'budget' && styles.tabIconActive]}>💰</Text>
           <Text style={[styles.tabLabel, activeTab === 'budget' && styles.tabLabelActive]}>가계부</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.tabItem}
+          onPress={() => setActiveTab('together')}
+        >
+          <Text style={[styles.tabIcon, activeTab === 'together' && styles.tabIconActive]}>👨‍👩‍👧</Text>
+          <Text style={[styles.tabLabel, activeTab === 'together' && styles.tabLabelActive]}>함께해요</Text>
         </TouchableOpacity>
       </View>
 

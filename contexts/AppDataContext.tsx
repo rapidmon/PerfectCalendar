@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { AppDataStore } from '../stores/AppDataStore';
 import { Todo } from '../types/todo';
 import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
+import { Investment } from '../types/investment';
+import { Savings } from '../types/savings';
 
 /**
  * AppData - Context value interface exposing store state and the store instance.
@@ -17,7 +19,12 @@ export interface AppData {
     fixedCategories: string[];
     monthlyGoals: MonthlyGoal;
     accountBalances: AccountBalances;
+    investments: Investment[];
+    savings: Savings[];
     isLoaded: boolean;
+    isGroupConnected: boolean;
+    groupCode: string | null;
+    userName: string | null;
     store: AppDataStore;
 }
 
@@ -48,7 +55,12 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         fixedCategories: store.fixedCategories,
         monthlyGoals: store.monthlyGoals,
         accountBalances: store.accountBalances,
+        investments: store.investments,
+        savings: store.savings,
         isLoaded: store.isLoaded,
+        isGroupConnected: store.isGroupConnected,
+        groupCode: store.groupCode,
+        userName: store.userName,
         store,
     };
 
