@@ -13,6 +13,7 @@ interface CombinedWidgetScreenProps {
     accounts: string[];
     accountInitialBalances: AccountBalances;
     monthlyGoals: MonthlyGoal;
+    fixedExpenseCategories: string[];
 }
 
 // ── 할 일 콘텐츠 ──
@@ -215,11 +216,12 @@ function AccountCard({ name, balance }: { name: string; balance: number }) {
     );
 }
 
-function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals }: {
+function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals, fixedExpenseCategories }: {
     budgets: Budget[];
     accounts: string[];
     accountInitialBalances: AccountBalances;
     monthlyGoals: MonthlyGoal;
+    fixedExpenseCategories: string[];
 }) {
     // 앱과 동일한 방식으로 통장별 잔액 계산
     const accountEntries = accounts.map(account => {
@@ -236,15 +238,17 @@ function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals
         return { name: account, balance };
     });
 
-    // 이번 달 목표 잔여 금액 계산
+    // 이번 달 목표 잔여 금액 계산 (고정지출 제외 — 가계부 탭과 동일)
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthlyGoal = monthlyGoals[yearMonth] || 0;
     const monthPrefix = `${yearMonth}-`;
-    const monthlyExpense = budgets
-        .filter(b => b.type === 'EXPENSE' && b.date.startsWith(monthPrefix))
+    const monthBudgets = budgets.filter(b => b.type === 'EXPENSE' && b.date.startsWith(monthPrefix));
+    const monthlyExpense = monthBudgets.reduce((sum, b) => sum + Math.abs(b.money), 0);
+    const fixedExpense = monthBudgets
+        .filter(b => fixedExpenseCategories.includes(b.category))
         .reduce((sum, b) => sum + Math.abs(b.money), 0);
-    const remaining = monthlyGoal - monthlyExpense;
+    const remaining = monthlyGoal - (monthlyExpense - fixedExpense);
 
     return (
         <FlexWidget
@@ -327,7 +331,7 @@ function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals
 
 // ── 통합 위젯 ──
 
-export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, accountInitialBalances, monthlyGoals }: CombinedWidgetScreenProps) {
+export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, accountInitialBalances, monthlyGoals, fixedExpenseCategories }: CombinedWidgetScreenProps) {
     return (
         <FlexWidget
             style={{
@@ -395,7 +399,7 @@ export default function CombinedWidgetScreen({ todos, budgets, activeTab, accoun
             {/* 콘텐츠 */}
             {activeTab === 'todo'
                 ? <TodoContent todos={todos} />
-                : <BudgetContent budgets={budgets} accounts={accounts} accountInitialBalances={accountInitialBalances} monthlyGoals={monthlyGoals} />
+                : <BudgetContent budgets={budgets} accounts={accounts} accountInitialBalances={accountInitialBalances} monthlyGoals={monthlyGoals} fixedExpenseCategories={fixedExpenseCategories} />
             }
         </FlexWidget>
     );

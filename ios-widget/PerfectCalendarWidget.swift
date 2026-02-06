@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 // MARK: - Data Models
 
@@ -7,7 +8,7 @@ struct TodoItem: Codable, Identifiable {
     let id: String
     let title: String
     let type: String
-    let completed: Bool
+    var completed: Bool
     let deadline: String?
     let specificDate: String?
     let createdAt: String?
@@ -43,8 +44,19 @@ struct DataProvider {
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
+    private static func saveJSON<T: Encodable>(_ value: T, forKey key: String) {
+        guard let defaults = defaults(),
+              let data = try? JSONEncoder().encode(value),
+              let jsonString = String(data: data, encoding: .utf8) else { return }
+        defaults.set(jsonString, forKey: key)
+    }
+
     static func loadTodos() -> [TodoItem] {
         loadJSON("widget_todos") ?? []
+    }
+
+    static func saveTodos(_ todos: [TodoItem]) {
+        saveJSON(todos, forKey: "widget_todos")
     }
 
     static func loadBudgets() -> [BudgetItem] {
@@ -62,6 +74,18 @@ struct DataProvider {
     static func loadMonthlyGoals() -> [String: Int] {
         loadJSON("widget_monthly_goals") ?? [:]
     }
+
+    static func loadFixedExpenseCategories() -> [String] {
+        loadJSON("widget_fixed_expense_categories") ?? []
+    }
+
+    static func loadActiveTab() -> String {
+        defaults()?.string(forKey: "widget_active_tab") ?? "todo"
+    }
+
+    static func saveActiveTab(_ tab: String) {
+        defaults()?.set(tab, forKey: "widget_active_tab")
+    }
 }
 
 // MARK: - Timeline
@@ -73,11 +97,13 @@ struct CalendarEntry: TimelineEntry {
     let accounts: [String]
     let accountBalances: [String: Int]
     let monthlyGoals: [String: Int]
+    let fixedExpenseCategories: [String]
+    let activeTab: String
 }
 
 struct CalendarTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> CalendarEntry {
-        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], accountBalances: [:], monthlyGoals: [:])
+        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], accountBalances: [:], monthlyGoals: [:], fixedExpenseCategories: [], activeTab: "todo")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CalendarEntry) -> Void) {
@@ -97,7 +123,9 @@ struct CalendarTimelineProvider: TimelineProvider {
             budgets: DataProvider.loadBudgets(),
             accounts: DataProvider.loadAccounts(),
             accountBalances: DataProvider.loadAccountBalances(),
-            monthlyGoals: DataProvider.loadMonthlyGoals()
+            monthlyGoals: DataProvider.loadMonthlyGoals(),
+            fixedExpenseCategories: DataProvider.loadFixedExpenseCategories(),
+            activeTab: DataProvider.loadActiveTab()
         )
     }
 }
@@ -126,7 +154,7 @@ func todayString() -> String {
     return formatter.string(from: Date())
 }
 
-// MARK: - Progress Bar (matches Android 20-block bar)
+// MARK: - Progress Bar
 
 enum BlockColor {
     case green, orange, red, gray
@@ -200,6 +228,80 @@ func calculateTodoProgress(_ todo: TodoItem) -> TodoProgressInfo {
     return TodoProgressInfo(hasProgress: true, blocks: blocks, daysLeft: daysLeft, label: label)
 }
 
+// MARK: - App Intents
+
+struct SwitchTabIntent: AppIntent {
+    static var title: LocalizedStringResource = "탭 전환"
+    static var description = IntentDescription("위젯 탭을 전환합니다")
+
+    @Parameter(title: "탭")
+    var tab: String
+
+    init() {
+        self.tab = "todo"
+    }
+
+    init(tab: String) {
+        self.tab = tab
+    }
+
+    func perform() async throws -> some IntentResult {
+        DataProvider.saveActiveTab(tab)
+        WidgetCenter.shared.reloadAllTimelines()
+        return .result()
+    }
+}
+
+struct CompleteTodoIntent: AppIntent {
+    static var title: LocalizedStringResource = "할 일 완료"
+    static var description = IntentDescription("할 일을 완료 처리합니다")
+
+    @Parameter(title: "할 일 ID")
+    var todoId: String
+
+    init() {
+        self.todoId = ""
+    }
+
+    init(todoId: String) {
+        self.todoId = todoId
+    }
+
+    func perform() async throws -> some IntentResult {
+        var todos = DataProvider.loadTodos()
+        if let index = todos.firstIndex(where: { $0.id == todoId }) {
+            todos[index].completed = true
+            DataProvider.saveTodos(todos)
+        }
+        WidgetCenter.shared.reloadAllTimelines()
+        return .result()
+    }
+}
+
+struct DeleteTodoIntent: AppIntent {
+    static var title: LocalizedStringResource = "할 일 삭제"
+    static var description = IntentDescription("할 일을 삭제합니다")
+
+    @Parameter(title: "할 일 ID")
+    var todoId: String
+
+    init() {
+        self.todoId = ""
+    }
+
+    init(todoId: String) {
+        self.todoId = todoId
+    }
+
+    func perform() async throws -> some IntentResult {
+        var todos = DataProvider.loadTodos()
+        todos.removeAll(where: { $0.id == todoId })
+        DataProvider.saveTodos(todos)
+        WidgetCenter.shared.reloadAllTimelines()
+        return .result()
+    }
+}
+
 // MARK: - Progress Bar View
 
 struct ProgressBarView: View {
@@ -216,9 +318,45 @@ struct ProgressBarView: View {
     }
 }
 
-// MARK: - Todo Card View (matches Android TodoCard)
+// MARK: - Tab Bar View
 
-struct TodoCardView: View {
+struct TabBarView: View {
+    let activeTab: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(intent: SwitchTabIntent(tab: "todo")) {
+                Text("할 일")
+                    .font(.system(size: 13, weight: activeTab == "todo" ? .bold : .regular))
+                    .foregroundColor(activeTab == "todo" ? .white : Color(red: 0.4, green: 0.4, blue: 0.4))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(activeTab == "todo"
+                        ? Color(red: 0.25, green: 0.47, blue: 0.85)
+                        : Color(red: 0.93, green: 0.93, blue: 0.93))
+                    .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+
+            Button(intent: SwitchTabIntent(tab: "budget")) {
+                Text("가계부")
+                    .font(.system(size: 13, weight: activeTab == "budget" ? .bold : .regular))
+                    .foregroundColor(activeTab == "budget" ? .white : Color(red: 0.4, green: 0.4, blue: 0.4))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(activeTab == "budget"
+                        ? Color(red: 0.25, green: 0.47, blue: 0.85)
+                        : Color(red: 0.93, green: 0.93, blue: 0.93))
+                    .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+}
+
+// MARK: - Interactive Todo Card View
+
+struct InteractiveTodoCardView: View {
     let todo: TodoItem
 
     var body: some View {
@@ -231,6 +369,19 @@ struct TodoCardView: View {
                     .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
                     .lineLimit(1)
                 Spacer()
+                Button(intent: CompleteTodoIntent(todoId: todo.id)) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 0.30, green: 0.69, blue: 0.31))
+                }
+                .buttonStyle(.plain)
+
+                Button(intent: DeleteTodoIntent(todoId: todo.id)) {
+                    Image(systemName: "trash.circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(Color(red: 0.96, green: 0.26, blue: 0.21))
+                }
+                .buttonStyle(.plain)
             }
 
             if progress.hasProgress {
@@ -252,9 +403,9 @@ struct TodoCardView: View {
     }
 }
 
-// MARK: - Todo Section View
+// MARK: - Todo Tab Content
 
-struct TodoSectionView: View {
+struct TodoTabContent: View {
     let todos: [TodoItem]
     let maxItems: Int
 
@@ -270,11 +421,6 @@ struct TodoSectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("✅ 할 일")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
-                .padding(.bottom, 2)
-
             if activeTodos.isEmpty {
                 Text("할 일이 없습니다")
                     .font(.system(size: 12))
@@ -283,20 +429,33 @@ struct TodoSectionView: View {
                     .padding(.vertical, 8)
             } else {
                 ForEach(Array(activeTodos.prefix(maxItems))) { todo in
-                    TodoCardView(todo: todo)
+                    InteractiveTodoCardView(todo: todo)
                 }
+            }
+
+            Link(destination: URL(string: "perfectcalendar://")!) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14))
+                    Text("할 일 추가")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(Color(red: 0.25, green: 0.47, blue: 0.85))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 6)
             }
         }
     }
 }
 
-// MARK: - Account Balance View (matches Android BudgetContent)
+// MARK: - Budget Tab Content
 
-struct AccountBalanceSectionView: View {
+struct BudgetTabContent: View {
     let budgets: [BudgetItem]
     let accounts: [String]
     let accountBalances: [String: Int]
     let monthlyGoals: [String: Int]
+    let fixedExpenseCategories: [String]
 
     struct AccountEntry {
         let name: String
@@ -327,10 +486,12 @@ struct AccountBalanceSectionView: View {
         let yearMonth = formatter.string(from: Date())
         guard let goal = monthlyGoals[yearMonth], goal > 0 else { return nil }
         let monthPrefix = yearMonth + "-"
-        let expense = budgets
-            .filter { $0.type == "EXPENSE" && $0.date.hasPrefix(monthPrefix) }
+        let monthBudgets = budgets.filter { $0.type == "EXPENSE" && $0.date.hasPrefix(monthPrefix) }
+        let expense = monthBudgets.reduce(0) { $0 + abs($1.money) }
+        let fixedExpense = monthBudgets
+            .filter { fixedExpenseCategories.contains($0.category) }
             .reduce(0) { $0 + abs($1.money) }
-        return goal - expense
+        return goal - (expense - fixedExpense)
     }
 
     var body: some View {
@@ -354,11 +515,6 @@ struct AccountBalanceSectionView: View {
                     : Color(red: 1.0, green: 0.92, blue: 0.93))
                 .cornerRadius(10)
             }
-
-            Text("💰 통장별 잔액")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
-                .padding(.bottom, 2)
 
             if accountEntries.isEmpty {
                 Text("등록된 통장이 없습니다")
@@ -385,6 +541,18 @@ struct AccountBalanceSectionView: View {
                     .cornerRadius(10)
                 }
             }
+
+            Link(destination: URL(string: "perfectcalendar://")!) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14))
+                    Text("항목 추가")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(Color(red: 0.25, green: 0.47, blue: 0.85))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 6)
+            }
         }
     }
 }
@@ -404,26 +572,24 @@ struct CalendarWidgetView: View {
     }
 
     var body: some View {
-        Link(destination: URL(string: "perfectcalendar://")!) {
-            VStack(alignment: .leading, spacing: 6) {
-                TodoSectionView(todos: entry.todos, maxItems: maxTodoItems)
+        VStack(alignment: .leading, spacing: 6) {
+            TabBarView(activeTab: entry.activeTab)
 
-                if family == .systemLarge {
-                    Divider()
-                        .padding(.vertical, 2)
-                }
-
-                AccountBalanceSectionView(
+            if entry.activeTab == "todo" {
+                TodoTabContent(todos: entry.todos, maxItems: maxTodoItems)
+            } else {
+                BudgetTabContent(
                     budgets: entry.budgets,
                     accounts: entry.accounts,
                     accountBalances: entry.accountBalances,
-                    monthlyGoals: entry.monthlyGoals
+                    monthlyGoals: entry.monthlyGoals,
+                    fixedExpenseCategories: entry.fixedExpenseCategories
                 )
-
-                Spacer(minLength: 0)
             }
-            .padding(4)
+
+            Spacer(minLength: 0)
         }
+        .padding(4)
     }
 }
 
@@ -434,14 +600,8 @@ struct PerfectCalendarWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: CalendarTimelineProvider()) { entry in
-            if #available(iOS 17.0, *) {
-                CalendarWidgetView(entry: entry)
-                    .containerBackground(.fill.tertiary, for: .widget)
-            } else {
-                CalendarWidgetView(entry: entry)
-                    .padding()
-                    .background(Color(UIColor.systemBackground))
-            }
+            CalendarWidgetView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("PerfectCalendar")
         .description("할 일과 가계부를 한눈에")

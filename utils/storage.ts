@@ -117,6 +117,7 @@ export const saveFixedExpenseCategories = async (categories: string[]): Promise<
     try {
         const jsonValue = JSON.stringify(categories);
         await AsyncStorage.setItem(FIXED_EXPENSE_CATEGORIES_KEY, jsonValue);
+        syncToWidgetStorage('widget_fixed_expense_categories', jsonValue);
     } catch (e) {
         console.error('고정지출 카테고리 저장 실패:', e);
     }

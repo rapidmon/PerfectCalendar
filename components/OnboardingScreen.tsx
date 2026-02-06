@@ -23,6 +23,16 @@ interface OnboardingScreenProps {
     onComplete: () => void;
 }
 
+const TOTAL_PAGES = 2;
+
+const FEATURES = [
+    { icon: '📅', title: '캘린더', desc: '날짜별로 일정과 지출을 한눈에', color: '#4A90E2' },
+    { icon: '✅', title: '할 일', desc: '반복, 마감일, 특정일 할 일 관리', color: '#4CAF50' },
+    { icon: '💰', title: '가계부', desc: '통장별 수입/지출 추적', color: '#FF9800' },
+    { icon: '📈', title: '투자', desc: '한국/미국 주식 포트폴리오 관리', color: '#9C27B0' },
+    { icon: '👨‍👩‍👧', title: '함께해요', desc: '가족/커플과 가계부 & 할 일 공유', color: '#E91E63' },
+];
+
 export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
     const [page, setPage] = useState(0);
 
@@ -90,42 +100,49 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
         onComplete();
     };
 
+    const renderPageDots = () => (
+        <View style={styles.dotsContainer}>
+            {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
+                <View
+                    key={i}
+                    style={[styles.dot, i === page && styles.dotActive]}
+                />
+            ))}
+        </View>
+    );
+
     if (page === 0) {
         return (
             <View style={styles.container}>
-                <View style={styles.introContent}>
+                <ScrollView
+                    style={styles.introScroll}
+                    contentContainerStyle={styles.introScrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
                     <Image
                         source={require('../logo.png')}
                         style={styles.logo}
                         resizeMode="contain"
                     />
                     <Text style={styles.appName}>PerfectCalendar</Text>
+                    <Text style={styles.tagline}>당신의 완벽한 일상 관리</Text>
+                    <Text style={styles.welcomeText}>환영합니다!</Text>
 
                     <View style={styles.featureList}>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureIcon}>📅</Text>
-                            <View style={styles.featureTextWrap}>
-                                <Text style={styles.featureTitle}>캘린더</Text>
-                                <Text style={styles.featureDesc}>날짜별로 일정과 지출을 한눈에</Text>
+                        {FEATURES.map((feature, index) => (
+                            <View key={index} style={styles.featureItem}>
+                                <View style={[styles.featureColorBar, { backgroundColor: feature.color }]} />
+                                <Text style={styles.featureIcon}>{feature.icon}</Text>
+                                <View style={styles.featureTextWrap}>
+                                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                                    <Text style={styles.featureDesc}>{feature.desc}</Text>
+                                </View>
                             </View>
-                        </View>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureIcon}>✅</Text>
-                            <View style={styles.featureTextWrap}>
-                                <Text style={styles.featureTitle}>할 일</Text>
-                                <Text style={styles.featureDesc}>반복, 마감일, 특정일 할 일 관리</Text>
-                            </View>
-                        </View>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureIcon}>💰</Text>
-                            <View style={styles.featureTextWrap}>
-                                <Text style={styles.featureTitle}>가계부</Text>
-                                <Text style={styles.featureDesc}>통장별 수입/지출 추적</Text>
-                            </View>
-                        </View>
+                        ))}
                     </View>
-                </View>
+                </ScrollView>
 
+                {renderPageDots()}
                 <TouchableOpacity style={styles.nextButton} onPress={() => setPage(1)}>
                     <Text style={styles.nextButtonText}>다음</Text>
                 </TouchableOpacity>
@@ -208,6 +225,7 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
                 )}
             </ScrollView>
 
+            {renderPageDots()}
             <TouchableOpacity style={styles.nextButton} onPress={handleFinish}>
                 <Text style={styles.nextButtonText}>시작하기</Text>
             </TouchableOpacity>
@@ -222,56 +240,99 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingBottom: 20,
     },
-    introContent: {
+    introScroll: {
         flex: 1,
+    },
+    introScrollContent: {
         alignItems: 'center',
-        justifyContent: 'center',
+        paddingTop: 48,
+        paddingBottom: 16,
     },
     logo: {
-        width: 120,
-        height: 120,
-        marginBottom: 16,
+        width: 100,
+        height: 100,
+        marginBottom: 12,
     },
     appName: {
         fontSize: 28,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 40,
+        marginBottom: 4,
+    },
+    tagline: {
+        fontSize: 15,
+        color: '#888',
+        marginBottom: 20,
+    },
+    welcomeText: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: '#4A90E2',
+        marginBottom: 20,
     },
     featureList: {
         width: '100%',
-        gap: 20,
+        gap: 12,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#F8F9FA',
         borderRadius: 12,
-        padding: 16,
+        padding: 14,
+        overflow: 'hidden',
+    },
+    featureColorBar: {
+        width: 4,
+        height: '100%',
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        bottom: 0,
+        borderTopLeftRadius: 12,
+        borderBottomLeftRadius: 12,
     },
     featureIcon: {
-        fontSize: 32,
-        marginRight: 16,
+        fontSize: 28,
+        marginLeft: 8,
+        marginRight: 14,
     },
     featureTextWrap: {
         flex: 1,
     },
     featureTitle: {
-        fontSize: 17,
+        fontSize: 16,
         fontWeight: '700',
         color: '#333',
-        marginBottom: 4,
+        marginBottom: 2,
     },
     featureDesc: {
-        fontSize: 14,
+        fontSize: 13,
         color: '#666',
+    },
+    dotsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 8,
+        paddingVertical: 12,
+    },
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#DDD',
+    },
+    dotActive: {
+        backgroundColor: '#4A90E2',
+        width: 20,
+        borderRadius: 4,
     },
     nextButton: {
         backgroundColor: '#4A90E2',
         borderRadius: 12,
         padding: 16,
         alignItems: 'center',
-        marginTop: 16,
     },
     nextButtonText: {
         color: '#fff',

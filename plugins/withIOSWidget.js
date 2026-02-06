@@ -152,6 +152,10 @@ function withWidgetTarget(config) {
       target: widgetTarget.uuid,
       link: true,
     });
+    xcodeProject.addFramework("AppIntents.framework", {
+      target: widgetTarget.uuid,
+      link: true,
+    });
 
     // 위젯 타겟 빌드 설정
     const configurations = xcodeProject.pbxXCBuildConfigurationSection();
@@ -174,7 +178,7 @@ function withWidgetTarget(config) {
               PRODUCT_BUNDLE_IDENTIFIER: `"${widgetBundleId}"`,
               MARKETING_VERSION: "1.0",
               CURRENT_PROJECT_VERSION: "1",
-              IPHONEOS_DEPLOYMENT_TARGET: "16.0",
+              IPHONEOS_DEPLOYMENT_TARGET: "17.0",
               GENERATE_INFOPLIST_FILE: "NO",
               SWIFT_EMIT_LOC_STRINGS: "YES",
               CODE_SIGN_STYLE: "Automatic",
