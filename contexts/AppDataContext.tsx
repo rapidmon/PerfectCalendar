@@ -4,6 +4,7 @@ import { Todo } from '../types/todo';
 import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
 import { Investment } from '../types/investment';
 import { Savings } from '../types/savings';
+import { AccountOwnership } from '../firebase';
 
 /**
  * AppData - Context value interface exposing store state and the store instance.
@@ -19,6 +20,7 @@ export interface AppData {
     fixedCategories: string[];
     monthlyGoals: MonthlyGoal;
     accountBalances: AccountBalances;
+    accountOwners: AccountOwnership;
     investments: Investment[];
     savings: Savings[];
     isLoaded: boolean;
@@ -55,6 +57,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         fixedCategories: store.fixedCategories,
         monthlyGoals: store.monthlyGoals,
         accountBalances: store.accountBalances,
+        accountOwners: store.accountOwners,
         investments: store.investments,
         savings: store.savings,
         isLoaded: store.isLoaded,

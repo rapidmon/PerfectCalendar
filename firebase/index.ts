@@ -41,3 +41,13 @@ export {
   uploadLocalTodos,
   fetchMyTodos
 } from './todoService';
+
+// 통장 서비스
+export {
+  saveSharedAccounts,
+  getSharedAccounts,
+  subscribeToSharedAccountsAsync,
+  uploadLocalAccounts,
+  addSharedAccount
+} from './accountService';
+export type { SharedAccounts, AccountOwnership } from './accountService';

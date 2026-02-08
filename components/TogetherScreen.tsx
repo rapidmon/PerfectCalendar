@@ -20,14 +20,35 @@ import {
   ensureAuthenticated,
   uploadLocalBudgets,
   uploadLocalTodos,
+  uploadLocalAccounts,
   Group
 } from '../firebase';
 import { useAppData } from '../contexts/AppDataContext';
 
 type ScreenMode = 'loading' | 'not_connected' | 'connected';
 
+// 소유자별 색상 (멤버 구분용)
+const OWNER_COLORS = [
+    '#4A90E2', // 파랑
+    '#E91E63', // 핑크
+    '#9C27B0', // 보라
+    '#FF9800', // 주황
+    '#009688', // 청록
+    '#795548', // 갈색
+];
+
+// uid를 기반으로 일관된 색상 인덱스 생성
+const getOwnerColorIndex = (uid: string): number => {
+    let hash = 0;
+    for (let i = 0; i < uid.length; i++) {
+        hash = ((hash << 5) - hash) + uid.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return Math.abs(hash) % OWNER_COLORS.length;
+};
+
 export default function TogetherScreen() {
-  const { store, budgets, todos } = useAppData();
+  const { store, budgets, todos, accounts, accountBalances } = useAppData();
   const [mode, setMode] = useState<ScreenMode>('loading');
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [showCreateInput, setShowCreateInput] = useState(false);
@@ -84,7 +105,7 @@ export default function TogetherScreen() {
       await store.startGroupSync();
 
       // 기존 데이터 업로드 (옵션 선택 시)
-      if (uploadExisting && (budgets.length > 0 || todos.length > 0)) {
+      if (uploadExisting && (budgets.length > 0 || todos.length > 0 || accounts.length > 0)) {
         let uploadMessage = '';
 
         if (budgets.length > 0) {
@@ -114,6 +135,12 @@ export default function TogetherScreen() {
           const todoCount = await uploadLocalTodos(todoData);
           if (uploadMessage) uploadMessage += ', ';
           uploadMessage += `할 일 ${todoCount}개`;
+        }
+
+        if (accounts.length > 0) {
+          await uploadLocalAccounts(accounts, accountBalances);
+          if (uploadMessage) uploadMessage += ', ';
+          uploadMessage += `통장 ${accounts.length}개`;
         }
 
         if (uploadMessage) {
@@ -231,11 +258,20 @@ export default function TogetherScreen() {
             <Text style={styles.infoValue}>{userName}</Text>
           </View>
 
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>멤버</Text>
-            <Text style={styles.infoValue}>
-              {memberNames.join(', ')} ({memberCount}명)
-            </Text>
+          <View style={styles.memberSection}>
+            <Text style={styles.infoLabel}>멤버 ({memberCount}명)</Text>
+            <View style={styles.memberList}>
+              {groupInfo?.members.map((uid) => {
+                const name = groupInfo.memberNames?.[uid] || '알 수 없음';
+                const color = OWNER_COLORS[getOwnerColorIndex(uid)];
+                return (
+                  <View key={uid} style={styles.memberItem}>
+                    <View style={[styles.memberColorDot, { backgroundColor: color }]} />
+                    <Text style={styles.memberName}>{name}</Text>
+                  </View>
+                );
+              })}
+            </View>
           </View>
 
           <TouchableOpacity style={styles.shareButton} onPress={handleShareCode}>
@@ -249,7 +285,7 @@ export default function TogetherScreen() {
 
         <View style={styles.syncInfo}>
           <Text style={styles.syncInfoText}>
-            가계부와 할 일이 실시간으로 동기화됩니다.
+            가계부, 할 일, 통장이 실시간으로 동기화됩니다.
           </Text>
         </View>
       </View>
@@ -300,7 +336,7 @@ export default function TogetherScreen() {
             value={userName}
             onChangeText={setUserName}
           />
-          {(budgets.length > 0 || todos.length > 0) && (
+          {(budgets.length > 0 || todos.length > 0 || accounts.length > 0) && (
             <TouchableOpacity
               style={styles.checkboxRow}
               onPress={() => setUploadExisting(!uploadExisting)}
@@ -309,7 +345,7 @@ export default function TogetherScreen() {
                 {uploadExisting && <Text style={styles.checkmark}>✓</Text>}
               </View>
               <Text style={styles.checkboxLabel}>
-                기존 데이터 공유하기 (가계부 {budgets.length}개, 할 일 {todos.length}개)
+                기존 데이터 공유하기 (가계부 {budgets.length}개, 할 일 {todos.length}개, 통장 {accounts.length}개)
               </Text>
             </TouchableOpacity>
           )}
@@ -552,6 +588,36 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#E0E8F0',
+  },
+  memberSection: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E8F0',
+  },
+  memberList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 8,
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  memberColorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  memberName: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
   },
   infoLabel: {
     fontSize: 15,

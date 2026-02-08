@@ -37,7 +37,14 @@ export default function SavingsActionModal({
     const totalPrincipal = getTotalPrincipal(savings);
     const nextPayment = getNextPaymentDate(savings);
 
-    const typeLabel = savings.type === 'FIXED_DEPOSIT' ? '정기예금' : '정기적금';
+    const getTypeLabel = () => {
+        switch (savings.type) {
+            case 'FIXED_DEPOSIT': return '정기예금';
+            case 'FREE_SAVINGS': return '자유적금';
+            default: return '정기적금';
+        }
+    };
+    const typeLabel = getTypeLabel();
 
     const formatDateStr = (dateStr: string): string => {
         const [year, month, day] = dateStr.split('-');
@@ -87,18 +94,33 @@ export default function SavingsActionModal({
                                 <Text style={styles.infoLabel}>월 납입금</Text>
                                 <Text style={styles.infoValue}>{formatMoneyNoSign(savings.monthlyAmount || 0)}</Text>
                             </View>
+                        ) : savings.type === 'FREE_SAVINGS' ? (
+                            <>
+                                {(savings.minMonthlyAmount || savings.maxMonthlyAmount) && (
+                                    <View style={styles.infoRow}>
+                                        <Text style={styles.infoLabel}>월 납입 한도</Text>
+                                        <Text style={styles.infoValue}>
+                                            {savings.minMonthlyAmount ? formatMoneyNoSign(savings.minMonthlyAmount) : '0'}
+                                            ~
+                                            {savings.maxMonthlyAmount ? formatMoneyNoSign(savings.maxMonthlyAmount) : '무제한'}
+                                        </Text>
+                                    </View>
+                                )}
+                            </>
                         ) : (
                             <View style={styles.infoRow}>
                                 <Text style={styles.infoLabel}>예치 원금</Text>
                                 <Text style={styles.infoValue}>{formatMoneyNoSign(savings.principal || 0)}</Text>
                             </View>
                         )}
+                        {savings.type !== 'FREE_SAVINGS' && (
+                            <View style={styles.infoRow}>
+                                <Text style={styles.infoLabel}>총 원금</Text>
+                                <Text style={styles.infoValue}>{formatMoneyNoSign(totalPrincipal)}</Text>
+                            </View>
+                        )}
                         <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>총 원금</Text>
-                            <Text style={styles.infoValue}>{formatMoneyNoSign(totalPrincipal)}</Text>
-                        </View>
-                        <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>현재까지 납입</Text>
+                            <Text style={styles.infoLabel}>{savings.type === 'FREE_SAVINGS' ? '현재 잔액' : '현재까지 납입'}</Text>
                             <Text style={styles.infoValue}>{formatMoneyNoSign(currentAmount)}</Text>
                         </View>
                         <View style={styles.infoRow}>

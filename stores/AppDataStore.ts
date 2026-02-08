@@ -22,6 +22,7 @@ import {
     ensureAuthenticated,
     subscribeToSharedBudgetsAsync,
     subscribeToSharedTodosAsync,
+    subscribeToSharedAccountsAsync,
     addSharedBudget,
     updateSharedBudget,
     deleteSharedBudget,
@@ -29,10 +30,14 @@ import {
     updateSharedTodo,
     deleteSharedTodo,
     toggleSharedTodoComplete,
+    saveSharedAccounts,
+    getSharedAccounts,
     fetchMyBudgets,
     fetchMyTodos,
     SharedBudget,
     SharedTodo,
+    SharedAccounts,
+    AccountOwnership,
 } from '../firebase';
 
 type Listener = () => void;
@@ -68,6 +73,7 @@ export class AppDataStore {
     private _fixedCategories: string[] = [];
     private _monthlyGoals: MonthlyGoal = {};
     private _accountBalances: AccountBalances = {};
+    private _accountOwners: AccountOwnership = {};  // 통장 소유자 정보
     private _investments: Investment[] = [];
     private _savings: Savings[] = [];
     private _isLoaded = false;
@@ -78,6 +84,7 @@ export class AppDataStore {
     private _userName: string | null = null;
     private _budgetUnsubscribe: Unsubscribe | null = null;
     private _todoUnsubscribe: Unsubscribe | null = null;
+    private _accountUnsubscribe: Unsubscribe | null = null;
 
     private _saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private _listeners = new Set<Listener>();
@@ -92,6 +99,7 @@ export class AppDataStore {
     get fixedCategories(): string[] { return this._fixedCategories; }
     get monthlyGoals(): MonthlyGoal { return this._monthlyGoals; }
     get accountBalances(): AccountBalances { return this._accountBalances; }
+    get accountOwners(): AccountOwnership { return this._accountOwners; }
     get investments(): Investment[] { return this._investments; }
     get savings(): Savings[] { return this._savings; }
     get isLoaded(): boolean { return this._isLoaded; }
@@ -163,17 +171,24 @@ export class AppDataStore {
 
         if (missingPayments.length === 0) return;
 
+        // savingsId로 적금 정보를 빠르게 찾기 위한 맵
+        const savingsMap = new Map(this._savings.map(s => [s.id, s]));
+
         // 누락된 납입 기록을 가계부에 추가
-        const newBudgets: Budget[] = missingPayments.map(payment => ({
-            id: `savings_${payment.savingsId}_${payment.paymentMonth}_${Date.now()}`,
-            title: `${payment.bankName} ${payment.savingsName}`,
-            money: payment.monthlyAmount,
-            date: payment.paymentDate,
-            type: 'EXPENSE' as const,
-            category: '저축',
-            savingsId: payment.savingsId,
-            savingsPaymentDate: payment.paymentMonth,
-        }));
+        const newBudgets: Budget[] = missingPayments.map(payment => {
+            const savings = savingsMap.get(payment.savingsId);
+            return {
+                id: `savings_${payment.savingsId}_${payment.paymentMonth}_${Date.now()}`,
+                title: `${payment.bankName} ${payment.savingsName}`,
+                money: payment.monthlyAmount,
+                date: payment.paymentDate,
+                type: 'EXPENSE' as const,
+                category: '저축',
+                account: savings?.linkedAccountName,  // 연결된 적금 통장으로 입금
+                savingsId: payment.savingsId,
+                savingsPaymentDate: payment.paymentMonth,
+            };
+        });
 
         this._budgets = [...this._budgets, ...newBudgets];
 
@@ -228,6 +243,17 @@ export class AppDataStore {
                 (error) => console.error('Todo sync error:', error)
             ) || null;
 
+            // 통장 실시간 구독
+            this._accountUnsubscribe = await subscribeToSharedAccountsAsync(
+                (sharedAccounts: SharedAccounts) => {
+                    this._accounts = sharedAccounts.accounts || [];
+                    this._accountBalances = sharedAccounts.balances || {};
+                    this._accountOwners = sharedAccounts.owners || {};
+                    this.notify();
+                },
+                (error) => console.error('Account sync error:', error)
+            ) || null;
+
             this.notify();
         } catch (error) {
             console.error('Start group sync error:', error);
@@ -242,6 +268,10 @@ export class AppDataStore {
         if (this._todoUnsubscribe) {
             this._todoUnsubscribe();
             this._todoUnsubscribe = null;
+        }
+        if (this._accountUnsubscribe) {
+            this._accountUnsubscribe();
+            this._accountUnsubscribe = null;
         }
     }
 
@@ -451,6 +481,16 @@ export class AppDataStore {
     // ── Account Management ─────────────────────────────────────
     addAccount(account: string): void {
         this._accounts = [...this._accounts, account];
+
+        // 그룹 연결 시 현재 사용자를 소유자로 설정
+        if (this._isGroupConnected) {
+            const uid = getCurrentUid();
+            if (uid) {
+                this._accountOwners = { ...this._accountOwners, [account]: uid };
+            }
+            saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners).catch(console.error);
+        }
+
         this.notify();
         this.debouncedSave('accounts', () => saveAccounts(this._accounts));
     }
@@ -458,7 +498,23 @@ export class AppDataStore {
     saveAccountsAndBalances(accs: string[], balances: AccountBalances): void {
         this._accounts = accs;
         this._accountBalances = balances;
+
+        // 삭제된 통장의 소유자 정보도 제거
+        const newOwners: AccountOwnership = {};
+        for (const acc of accs) {
+            if (this._accountOwners[acc]) {
+                newOwners[acc] = this._accountOwners[acc];
+            }
+        }
+        this._accountOwners = newOwners;
+
         this.notify();
+
+        if (this._isGroupConnected) {
+            // 그룹 연결 시 Firebase에 저장
+            saveSharedAccounts(accs, balances, this._accountOwners).catch(console.error);
+        }
+
         this.debouncedSave('accounts', () => saveAccounts(this._accounts));
         this.debouncedSave('accountBalances', () => saveAccountBalances(this._accountBalances));
     }
@@ -494,11 +550,36 @@ export class AppDataStore {
     // ── Savings CRUD ──────────────────────────────────────────
     addSavings(savings: Savings): void {
         this._savings = [...this._savings, savings];
+
+        // 연결된 통장 자동 생성
+        if (savings.linkedAccountName && !this._accounts.includes(savings.linkedAccountName)) {
+            this._accounts = [...this._accounts, savings.linkedAccountName];
+            // 초기 잔액 설정
+            if (savings.initialBalance && savings.initialBalance > 0) {
+                this._accountBalances = {
+                    ...this._accountBalances,
+                    [savings.linkedAccountName]: savings.initialBalance,
+                };
+                this.debouncedSave('accountBalances', () => saveAccountBalances(this._accountBalances));
+            }
+
+            // 그룹 연결 시 현재 사용자를 소유자로 설정
+            if (this._isGroupConnected) {
+                const uid = getCurrentUid();
+                if (uid) {
+                    this._accountOwners = { ...this._accountOwners, [savings.linkedAccountName]: uid };
+                }
+                saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners).catch(console.error);
+            }
+
+            this.debouncedSave('accounts', () => saveAccounts(this._accounts));
+        }
+
         this.notify();
         this.debouncedSave('savings', () => saveSavings(this._savings));
 
-        // 새 적금 추가 시 자동 납입 생성
-        if (!this._isGroupConnected) {
+        // 새 적금 추가 시 자동 납입 생성 (정기적금만)
+        if (!this._isGroupConnected && savings.type === 'INSTALLMENT_SAVINGS') {
             this.createSavingsPaymentsForSingle(savings);
         }
     }
@@ -516,6 +597,7 @@ export class AppDataStore {
             date: payment.paymentDate,
             type: 'EXPENSE' as const,
             category: '저축',
+            account: savings.linkedAccountName,  // 연결된 적금 통장으로 입금
             savingsId: payment.savingsId,
             savingsPaymentDate: payment.paymentMonth,
         }));
@@ -533,13 +615,30 @@ export class AppDataStore {
         this.debouncedSave('savings', () => saveSavings(this._savings));
     }
 
-    deleteSavings(id: string, deleteRelatedBudgets: boolean = true): void {
+    deleteSavings(id: string, deleteRelatedBudgets: boolean = true, deleteLinkedAccount: boolean = true): void {
+        const savingsToDelete = this._savings.find(s => s.id === id);
         this._savings = this._savings.filter(s => s.id !== id);
 
         // 관련 가계부 항목도 삭제
         if (deleteRelatedBudgets && !this._isGroupConnected) {
             this._budgets = this._budgets.filter(b => b.savingsId !== id);
             this.debouncedSave('budgets', () => saveBudgets(this._budgets));
+        }
+
+        // 연결된 통장도 삭제
+        if (deleteLinkedAccount && savingsToDelete?.linkedAccountName) {
+            const accountName = savingsToDelete.linkedAccountName;
+            this._accounts = this._accounts.filter(a => a !== accountName);
+            const newBalances = { ...this._accountBalances };
+            delete newBalances[accountName];
+            this._accountBalances = newBalances;
+            this.debouncedSave('accounts', () => saveAccounts(this._accounts));
+            this.debouncedSave('accountBalances', () => saveAccountBalances(this._accountBalances));
+
+            // 그룹 연결 시 Firebase에도 저장
+            if (this._isGroupConnected) {
+                saveSharedAccounts(this._accounts, this._accountBalances).catch(console.error);
+            }
         }
 
         this.notify();

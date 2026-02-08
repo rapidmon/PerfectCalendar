@@ -138,7 +138,8 @@ export function computeAccountBalances(
     budgets: Budget[],
     initialBalances: AccountBalances,
     accounts: string[],
-): { name: string; balance: number }[] {
+    owners?: { [accountName: string]: string },
+): { name: string; balance: number; ownerUid?: string }[] {
     const defaultAccount = accounts[0] || '기본';
 
     return accounts.map(account => {
@@ -154,6 +155,10 @@ export function computeAccountBalances(
             }
         }
 
-        return { name: account, balance };
+        return {
+            name: account,
+            balance,
+            ownerUid: owners?.[account],
+        };
     });
 }

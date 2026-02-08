@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { AccountBalances } from '../types/budget';
 
 const ACCOUNT_COLORS = [
     '#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C',
     '#1ABC9C', '#F39C12', '#3498DB', '#D35400', '#2ECC71',
 ];
+
+interface AccountItem {
+    key: string;
+    name: string;
+}
 
 interface AccountManageModalProps {
     visible: boolean;
@@ -22,15 +28,19 @@ export default function AccountManageModal({
     onClose,
     onSave,
 }: AccountManageModalProps) {
-    const [list, setList] = useState<string[]>([]);
+    const [list, setList] = useState<AccountItem[]>([]);
     const [balanceTexts, setBalanceTexts] = useState<Record<string, string>>({});
     const [newAccount, setNewAccount] = useState('');
-    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editingKey, setEditingKey] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
 
     useEffect(() => {
         if (visible) {
-            setList([...accounts]);
+            const items = accounts.map((name, index) => ({
+                key: `account-${index}-${name}`,
+                name,
+            }));
+            setList(items);
             const texts: Record<string, string> = {};
             for (const account of accounts) {
                 const val = initialBalances[account];
@@ -38,7 +48,7 @@ export default function AccountManageModal({
             }
             setBalanceTexts(texts);
             setNewAccount('');
-            setEditingIndex(null);
+            setEditingKey(null);
             setEditingName('');
         }
     }, [visible, accounts, initialBalances]);
@@ -46,45 +56,53 @@ export default function AccountManageModal({
     const handleAdd = () => {
         const trimmed = newAccount.trim();
         if (!trimmed) return;
-        if (list.includes(trimmed)) {
+        if (list.some(item => item.name === trimmed)) {
             Alert.alert('알림', '이미 존재하는 통장입니다.');
             return;
         }
-        setList(prev => [...prev, trimmed]);
+        const newItem: AccountItem = {
+            key: `account-${Date.now()}-${trimmed}`,
+            name: trimmed,
+        };
+        setList(prev => [...prev, newItem]);
         setBalanceTexts(prev => ({ ...prev, [trimmed]: '' }));
         setNewAccount('');
     };
 
-    const handleDelete = (acc: string) => {
-        setList(prev => prev.filter(a => a !== acc));
+    const handleDelete = (key: string, name: string) => {
+        setList(prev => prev.filter(item => item.key !== key));
         setBalanceTexts(prev => {
             const next = { ...prev };
-            delete next[acc];
+            delete next[name];
             return next;
         });
     };
 
-    const startEdit = (index: number) => {
-        setEditingIndex(index);
-        setEditingName(list[index]);
+    const startEdit = (key: string, name: string) => {
+        setEditingKey(key);
+        setEditingName(name);
     };
 
     const confirmEdit = () => {
-        if (editingIndex === null) return;
+        if (editingKey === null) return;
         const trimmed = editingName.trim();
-        const oldName = list[editingIndex];
+        const item = list.find(i => i.key === editingKey);
+        if (!item) return;
+        const oldName = item.name;
 
         if (!trimmed) {
             Alert.alert('알림', '통장 이름을 입력해 주세요.');
             return;
         }
-        if (trimmed !== oldName && list.includes(trimmed)) {
+        if (trimmed !== oldName && list.some(i => i.name === trimmed)) {
             Alert.alert('알림', '이미 존재하는 통장입니다.');
             return;
         }
 
         if (trimmed !== oldName) {
-            setList(prev => prev.map((a, i) => i === editingIndex ? trimmed : a));
+            setList(prev => prev.map(i =>
+                i.key === editingKey ? { ...i, name: trimmed } : i
+            ));
             setBalanceTexts(prev => {
                 const next = { ...prev };
                 next[trimmed] = next[oldName] || '';
@@ -92,12 +110,12 @@ export default function AccountManageModal({
                 return next;
             });
         }
-        setEditingIndex(null);
+        setEditingKey(null);
         setEditingName('');
     };
 
     const cancelEdit = () => {
-        setEditingIndex(null);
+        setEditingKey(null);
         setEditingName('');
     };
 
@@ -109,15 +127,76 @@ export default function AccountManageModal({
     };
 
     const handleSave = () => {
+        const accountNames = list.map(item => item.name);
         const balances: AccountBalances = {};
-        for (const account of list) {
-            const val = parseInt(balanceTexts[account] || '0', 10);
+        for (const name of accountNames) {
+            const val = parseInt(balanceTexts[name] || '0', 10);
             if (!isNaN(val)) {
-                balances[account] = val;
+                balances[name] = val;
             }
         }
-        onSave(list, balances);
+        onSave(accountNames, balances);
         onClose();
+    };
+
+    const renderItem = ({ item, drag, isActive, getIndex }: RenderItemParams<AccountItem>) => {
+        const index = getIndex() ?? 0;
+        const color = ACCOUNT_COLORS[index % ACCOUNT_COLORS.length];
+        const isEditing = editingKey === item.key;
+
+        return (
+            <ScaleDecorator>
+                <View style={[styles.itemRow, isActive && styles.itemRowActive]}>
+                    <TouchableOpacity
+                        onLongPress={drag}
+                        delayLongPress={100}
+                        style={styles.dragHandle}
+                    >
+                        <Text style={styles.dragIcon}>☰</Text>
+                    </TouchableOpacity>
+                    <View style={[styles.numberBadge, { backgroundColor: color }]}>
+                        <Text style={styles.numberBadgeText}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.itemInfo}>
+                        {isEditing ? (
+                            <View style={styles.editRow}>
+                                <TextInput
+                                    style={[styles.editInput, { borderColor: color }]}
+                                    value={editingName}
+                                    onChangeText={setEditingName}
+                                    onSubmitEditing={confirmEdit}
+                                    autoFocus
+                                />
+                                <TouchableOpacity onPress={confirmEdit} style={styles.editActionBtn}>
+                                    <Text style={styles.confirmText}>확인</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={cancelEdit} style={styles.editActionBtn}>
+                                    <Text style={styles.cancelEditText}>취소</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ) : (
+                            <TouchableOpacity onPress={() => startEdit(item.key, item.name)}>
+                                <Text style={styles.itemText}>{item.name} ✎</Text>
+                            </TouchableOpacity>
+                        )}
+                        <View style={styles.balanceRow}>
+                            <Text style={styles.balanceLabel}>초기 잔액</Text>
+                            <TextInput
+                                style={styles.balanceInput}
+                                placeholder="0"
+                                value={balanceTexts[item.name] || ''}
+                                onChangeText={(text) => handleBalanceChange(item.name, text)}
+                                keyboardType="numeric"
+                            />
+                            <Text style={styles.unit}>원</Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity onPress={() => handleDelete(item.key, item.name)} style={styles.deleteBtn}>
+                        <Text style={styles.deleteText}>삭제</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScaleDecorator>
+        );
     };
 
     return (
@@ -125,6 +204,7 @@ export default function AccountManageModal({
             <View style={styles.overlay}>
                 <View style={styles.modalContainer}>
                     <Text style={styles.modalTitle}>통장 관리</Text>
+                    <Text style={styles.hintText}>☰ 아이콘을 길게 눌러 순서를 변경하세요</Text>
 
                     <View style={styles.addRow}>
                         <TextInput
@@ -139,58 +219,19 @@ export default function AccountManageModal({
                         </TouchableOpacity>
                     </View>
 
-                    <ScrollView style={styles.list}>
-                        {list.map((acc, index) => {
-                            const color = ACCOUNT_COLORS[index % ACCOUNT_COLORS.length];
-                            return (
-                            <View key={`${index}-${acc}`} style={styles.itemRow}>
-                                <View style={[styles.numberBadge, { backgroundColor: color }]}>
-                                    <Text style={styles.numberBadgeText}>{index + 1}</Text>
-                                </View>
-                                <View style={styles.itemInfo}>
-                                    {editingIndex === index ? (
-                                        <View style={styles.editRow}>
-                                            <TextInput
-                                                style={[styles.editInput, { borderColor: color }]}
-                                                value={editingName}
-                                                onChangeText={setEditingName}
-                                                onSubmitEditing={confirmEdit}
-                                                autoFocus
-                                            />
-                                            <TouchableOpacity onPress={confirmEdit} style={styles.editActionBtn}>
-                                                <Text style={styles.confirmText}>확인</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity onPress={cancelEdit} style={styles.editActionBtn}>
-                                                <Text style={styles.cancelEditText}>취소</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    ) : (
-                                        <TouchableOpacity onPress={() => startEdit(index)}>
-                                            <Text style={styles.itemText}>{acc} ✎</Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    <View style={styles.balanceRow}>
-                                        <Text style={styles.balanceLabel}>초기 잔액</Text>
-                                        <TextInput
-                                            style={styles.balanceInput}
-                                            placeholder="0"
-                                            value={balanceTexts[acc] || ''}
-                                            onChangeText={(text) => handleBalanceChange(acc, text)}
-                                            keyboardType="numeric"
-                                        />
-                                        <Text style={styles.unit}>원</Text>
-                                    </View>
-                                </View>
-                                <TouchableOpacity onPress={() => handleDelete(acc)} style={styles.deleteBtn}>
-                                    <Text style={styles.deleteText}>삭제</Text>
-                                </TouchableOpacity>
-                            </View>
-                        );
-                        })}
-                        {list.length === 0 && (
+                    <View style={styles.listContainer}>
+                        {list.length === 0 ? (
                             <Text style={styles.emptyText}>통장이 없습니다</Text>
+                        ) : (
+                            <DraggableFlatList
+                                data={list}
+                                onDragEnd={({ data }) => setList(data)}
+                                keyExtractor={(item) => item.key}
+                                renderItem={renderItem}
+                                containerStyle={styles.flatListContainer}
+                            />
                         )}
-                    </ScrollView>
+                    </View>
 
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -225,8 +266,14 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 16,
+        marginBottom: 4,
         textAlign: 'center',
+    },
+    hintText: {
+        fontSize: 12,
+        color: '#888',
+        textAlign: 'center',
+        marginBottom: 16,
     },
     addRow: {
         flexDirection: 'row',
@@ -252,9 +299,12 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '600',
     },
-    list: {
+    listContainer: {
         maxHeight: 300,
         marginBottom: 16,
+    },
+    flatListContainer: {
+        maxHeight: 300,
     },
     itemRow: {
         flexDirection: 'row',
@@ -263,6 +313,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
+        backgroundColor: '#fff',
+    },
+    itemRowActive: {
+        backgroundColor: '#f5f5f5',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 4,
+        elevation: 5,
+    },
+    dragHandle: {
+        padding: 8,
+        marginRight: 4,
+    },
+    dragIcon: {
+        fontSize: 16,
+        color: '#999',
     },
     numberBadge: {
         width: 22,

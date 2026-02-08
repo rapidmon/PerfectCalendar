@@ -15,7 +15,7 @@ interface BudgetFullListProps {
 }
 
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
-    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, store } = useAppData();
+    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, accountOwners, isGroupConnected, store } = useAppData();
 
     const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(selectedDate.getMonth() + 1);
@@ -80,8 +80,8 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     );
 
     const accountBalanceList = useMemo(
-        () => computeAccountBalances(budgets, accountBalances, accounts),
-        [budgets, accountBalances, accounts]
+        () => computeAccountBalances(budgets, accountBalances, accounts, isGroupConnected ? accountOwners : undefined),
+        [budgets, accountBalances, accounts, accountOwners, isGroupConnected]
     );
 
     return (

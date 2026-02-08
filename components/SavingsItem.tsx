@@ -20,8 +20,17 @@ export default function SavingsItem({ savings, onPress }: SavingsItemProps) {
     const currentAmount = getCurrentPaidAmount(savings);
     const expectedAmount = getExpectedMaturityAmount(savings);
 
-    const typeLabel = savings.type === 'FIXED_DEPOSIT' ? '예금' : '적금';
-    const typeEmoji = savings.type === 'FIXED_DEPOSIT' ? '🏦' : '📊';
+    const getTypeInfo = () => {
+        switch (savings.type) {
+            case 'FIXED_DEPOSIT':
+                return { label: '예금', emoji: '🏦' };
+            case 'FREE_SAVINGS':
+                return { label: '자유적금', emoji: '💫' };
+            default:
+                return { label: '적금', emoji: '📊' };
+        }
+    };
+    const { label: typeLabel, emoji: typeEmoji } = getTypeInfo();
 
     return (
         <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
@@ -44,6 +53,12 @@ export default function SavingsItem({ savings, onPress }: SavingsItemProps) {
                 {savings.type === 'FIXED_DEPOSIT' ? (
                     <Text style={styles.infoText}>
                         원금 {formatMoneyNoSign(savings.principal || 0)}
+                    </Text>
+                ) : savings.type === 'FREE_SAVINGS' ? (
+                    <Text style={styles.infoText}>
+                        {savings.minMonthlyAmount && savings.maxMonthlyAmount
+                            ? `월 ${formatMoneyNoSign(savings.minMonthlyAmount)}~${formatMoneyNoSign(savings.maxMonthlyAmount)}`
+                            : '자유납입'}
                     </Text>
                 ) : (
                     <Text style={styles.infoText}>

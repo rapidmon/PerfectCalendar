@@ -40,13 +40,18 @@ export const getCurrentPaidAmount = (savings: Savings): number => {
         return savings.principal || 0;
     }
 
-    // 적금의 경우 납입 횟수 계산
+    if (savings.type === 'FREE_SAVINGS') {
+        // 자유적금은 초기 잔액만 반환 (실제 납입 내역은 가계부에서 별도 추적)
+        return savings.initialBalance || 0;
+    }
+
+    // 정기적금의 경우 납입 횟수 계산
     const today = new Date();
     const start = parseDate(savings.startDate);
     const end = parseDate(savings.endDate);
     const monthlyAmount = savings.monthlyAmount || 0;
 
-    if (today <= start) return 0;
+    if (today <= start) return savings.initialBalance || 0;
 
     // 총 납입 횟수 계산
     const totalMonths = getMonthsBetween(start, end);
@@ -60,7 +65,7 @@ export const getCurrentPaidAmount = (savings: Savings): number => {
 
     paidMonths = Math.min(paidMonths, totalMonths);
 
-    return paidMonths * monthlyAmount;
+    return paidMonths * monthlyAmount + (savings.initialBalance || 0);
 };
 
 // 예상 만기금액 계산 (단리)
@@ -75,11 +80,15 @@ export const getExpectedMaturityAmount = (savings: Savings): number => {
         // 정기예금: 원금 × (1 + 이율 × 기간)
         const principal = savings.principal || 0;
         return Math.round(principal * (1 + rate * years));
+    } else if (savings.type === 'FREE_SAVINGS') {
+        // 자유적금: 현재 잔액 기준으로 계산 (정확한 예측 불가)
+        const currentBalance = savings.initialBalance || 0;
+        return Math.round(currentBalance * (1 + rate * years));
     } else {
         // 정기적금: 월 납입금 × 납입횟수 + 이자
         // 단리 적금 이자 계산: 월 납입금 × (N × (N+1) / 2) × (월이율)
         const monthlyAmount = savings.monthlyAmount || 0;
-        const principal = monthlyAmount * totalMonths;
+        const principal = monthlyAmount * totalMonths + (savings.initialBalance || 0);
         const monthlyRate = rate / 12;
         const interest = monthlyAmount * (totalMonths * (totalMonths + 1) / 2) * monthlyRate;
         return Math.round(principal + interest);
@@ -90,11 +99,13 @@ export const getExpectedMaturityAmount = (savings: Savings): number => {
 export const getTotalPrincipal = (savings: Savings): number => {
     if (savings.type === 'FIXED_DEPOSIT') {
         return savings.principal || 0;
+    } else if (savings.type === 'FREE_SAVINGS') {
+        return savings.initialBalance || 0;
     } else {
         const start = parseDate(savings.startDate);
         const end = parseDate(savings.endDate);
         const totalMonths = getMonthsBetween(start, end);
-        return (savings.monthlyAmount || 0) * totalMonths;
+        return (savings.monthlyAmount || 0) * totalMonths + (savings.initialBalance || 0);
     }
 };
 
@@ -115,7 +126,8 @@ export const getTotalExpectedMaturity = (savingsList: Savings[]): number => {
 
 // 다음 납입일 계산 (적금)
 export const getNextPaymentDate = (savings: Savings): string | null => {
-    if (savings.type === 'FIXED_DEPOSIT') return null;
+    // 정기적금만 다음 납입일이 있음
+    if (savings.type !== 'INSTALLMENT_SAVINGS') return null;
 
     const today = new Date();
     const end = parseDate(savings.endDate);

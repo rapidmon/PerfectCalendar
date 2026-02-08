@@ -39,6 +39,9 @@ export default function AddSavingsModal({
     const [principal, setPrincipal] = useState('');
     const [monthlyAmount, setMonthlyAmount] = useState('');
     const [paymentDay, setPaymentDay] = useState('1');
+    const [minMonthlyAmount, setMinMonthlyAmount] = useState('');
+    const [maxMonthlyAmount, setMaxMonthlyAmount] = useState('');
+    const [initialBalance, setInitialBalance] = useState('');
     const [showStartPicker, setShowStartPicker] = useState(false);
     const [showEndPicker, setShowEndPicker] = useState(false);
 
@@ -53,6 +56,9 @@ export default function AddSavingsModal({
             setPrincipal(editingSavings.principal ? String(editingSavings.principal) : '');
             setMonthlyAmount(editingSavings.monthlyAmount ? String(editingSavings.monthlyAmount) : '');
             setPaymentDay(editingSavings.paymentDay ? String(editingSavings.paymentDay) : '1');
+            setMinMonthlyAmount(editingSavings.minMonthlyAmount ? String(editingSavings.minMonthlyAmount) : '');
+            setMaxMonthlyAmount(editingSavings.maxMonthlyAmount ? String(editingSavings.maxMonthlyAmount) : '');
+            setInitialBalance(editingSavings.initialBalance ? String(editingSavings.initialBalance) : '');
         } else {
             resetForm();
         }
@@ -68,11 +74,17 @@ export default function AddSavingsModal({
         setPrincipal('');
         setMonthlyAmount('');
         setPaymentDay('1');
+        setMinMonthlyAmount('');
+        setMaxMonthlyAmount('');
+        setInitialBalance('');
     };
 
     const handleSave = () => {
         const rate = parseFloat(interestRate);
         if (!name.trim() || isNaN(rate) || rate <= 0) return;
+
+        const initialBalanceNum = parseInt(initialBalance, 10) || 0;
+        const linkedAccountName = `[${bankName}] ${name.trim()}`;
 
         if (type === 'FIXED_DEPOSIT') {
             const principalNum = parseInt(principal, 10);
@@ -86,8 +98,10 @@ export default function AddSavingsModal({
                 startDate: startDate.toISOString().split('T')[0],
                 endDate: endDate.toISOString().split('T')[0],
                 principal: principalNum,
+                initialBalance: initialBalanceNum > 0 ? initialBalanceNum : undefined,
+                linkedAccountName,
             });
-        } else {
+        } else if (type === 'INSTALLMENT_SAVINGS') {
             const monthlyNum = parseInt(monthlyAmount, 10);
             const dayNum = parseInt(paymentDay, 10);
             if (isNaN(monthlyNum) || monthlyNum <= 0) return;
@@ -102,6 +116,25 @@ export default function AddSavingsModal({
                 endDate: endDate.toISOString().split('T')[0],
                 monthlyAmount: monthlyNum,
                 paymentDay: dayNum,
+                initialBalance: initialBalanceNum > 0 ? initialBalanceNum : undefined,
+                linkedAccountName,
+            });
+        } else {
+            // FREE_SAVINGS (자유적금)
+            const minNum = parseInt(minMonthlyAmount, 10) || 0;
+            const maxNum = parseInt(maxMonthlyAmount, 10) || 0;
+
+            onSave({
+                type,
+                name: name.trim(),
+                bankName,
+                interestRate: rate,
+                startDate: startDate.toISOString().split('T')[0],
+                endDate: endDate.toISOString().split('T')[0],
+                minMonthlyAmount: minNum > 0 ? minNum : undefined,
+                maxMonthlyAmount: maxNum > 0 ? maxNum : undefined,
+                initialBalance: initialBalanceNum > 0 ? initialBalanceNum : undefined,
+                linkedAccountName,
             });
         }
 
@@ -137,10 +170,13 @@ export default function AddSavingsModal({
         if (type === 'FIXED_DEPOSIT') {
             const principalNum = parseInt(principal, 10);
             return !isNaN(principalNum) && principalNum > 0;
-        } else {
+        } else if (type === 'INSTALLMENT_SAVINGS') {
             const monthlyNum = parseInt(monthlyAmount, 10);
             const dayNum = parseInt(paymentDay, 10);
             return !isNaN(monthlyNum) && monthlyNum > 0 && dayNum >= 1 && dayNum <= 31;
+        } else {
+            // FREE_SAVINGS - 최소/최대 한도는 선택사항
+            return true;
         }
     };
 
@@ -162,6 +198,14 @@ export default function AddSavingsModal({
                             >
                                 <Text style={[styles.typeLabel, type === 'INSTALLMENT_SAVINGS' && styles.typeLabelSelected]}>
                                     정기적금
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.typeButton, type === 'FREE_SAVINGS' && styles.typeSelected]}
+                                onPress={() => setType('FREE_SAVINGS')}
+                            >
+                                <Text style={[styles.typeLabel, type === 'FREE_SAVINGS' && styles.typeLabelSelected]}>
+                                    자유적금
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -221,7 +265,7 @@ export default function AddSavingsModal({
                                     keyboardType="numeric"
                                 />
                             </>
-                        ) : (
+                        ) : type === 'INSTALLMENT_SAVINGS' ? (
                             <>
                                 <Text style={styles.label}>월 납입금</Text>
                                 <TextInput
@@ -241,7 +285,37 @@ export default function AddSavingsModal({
                                     maxLength={2}
                                 />
                             </>
+                        ) : (
+                            <>
+                                <Text style={styles.label}>월 최소 납입금 (선택)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="최소 금액 (없으면 비워두세요)"
+                                    value={minMonthlyAmount}
+                                    onChangeText={(text) => handleNumberInput(text, setMinMonthlyAmount)}
+                                    keyboardType="numeric"
+                                />
+                                <Text style={styles.label}>월 최대 납입금 (선택)</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="최대 금액 (없으면 비워두세요)"
+                                    value={maxMonthlyAmount}
+                                    onChangeText={(text) => handleNumberInput(text, setMaxMonthlyAmount)}
+                                    keyboardType="numeric"
+                                />
+                            </>
                         )}
+
+                        {/* 초기 잔액 - 기존에 납입한 금액 */}
+                        <Text style={styles.label}>기존 납입 금액 (선택)</Text>
+                        <Text style={styles.hintText}>이미 납입한 금액이 있으면 입력하세요</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="0"
+                            value={initialBalance}
+                            onChangeText={(text) => handleNumberInput(text, setInitialBalance)}
+                            keyboardType="numeric"
+                        />
 
                         {/* 시작일 */}
                         <Text style={styles.label}>시작일</Text>
@@ -334,6 +408,12 @@ const styles = StyleSheet.create({
         color: '#666',
         marginBottom: 8,
         marginTop: 8,
+    },
+    hintText: {
+        fontSize: 12,
+        color: '#999',
+        marginBottom: 8,
+        marginTop: -4,
     },
     input: {
         borderWidth: 1,

@@ -3,6 +3,26 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MonthlyStats, computeYoYGrowthRate } from '../utils/budgetAnalytics';
 import { Budget } from '../types/budget';
 
+// 소유자별 색상 (멤버 구분용)
+const OWNER_COLORS = [
+    '#4A90E2', // 파랑
+    '#E91E63', // 핑크
+    '#9C27B0', // 보라
+    '#FF9800', // 주황
+    '#009688', // 청록
+    '#795548', // 갈색
+];
+
+// uid를 기반으로 일관된 색상 인덱스 생성
+const getOwnerColorIndex = (uid: string): number => {
+    let hash = 0;
+    for (let i = 0; i < uid.length; i++) {
+        hash = ((hash << 5) - hash) + uid.charCodeAt(i);
+        hash = hash & hash;
+    }
+    return Math.abs(hash) % OWNER_COLORS.length;
+};
+
 interface MonthlySummaryCardProps {
     year: number;
     month: number;
@@ -10,7 +30,7 @@ interface MonthlySummaryCardProps {
     budgets: Budget[];
     fixedCategories: string[];
     goalAmount: number | undefined;
-    accountBalances: { name: string; balance: number }[];
+    accountBalances: { name: string; balance: number; ownerUid?: string }[];
 }
 
 export default function MonthlySummaryCard({
@@ -58,17 +78,25 @@ export default function MonthlySummaryCard({
             {accountBalances.length > 0 && (
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>통장별 잔액</Text>
-                    {accountBalances.map(item => (
-                        <View key={item.name} style={styles.categoryRow}>
-                            <Text style={styles.categoryName}>{item.name}</Text>
-                            <Text style={[
-                                styles.categoryAmount,
-                                { color: item.balance >= 0 ? '#2196F3' : '#F44336' },
-                            ]}>
-                                {formatAmount(item.balance)}
-                            </Text>
-                        </View>
-                    ))}
+                    {accountBalances.map(item => {
+                        const ownerColor = item.ownerUid
+                            ? OWNER_COLORS[getOwnerColorIndex(item.ownerUid)]
+                            : undefined;
+                        return (
+                            <View key={item.name} style={styles.accountRow}>
+                                {ownerColor && (
+                                    <View style={[styles.ownerIndicator, { backgroundColor: ownerColor }]} />
+                                )}
+                                <Text style={[styles.categoryName, { flex: 1 }]}>{item.name}</Text>
+                                <Text style={[
+                                    styles.categoryAmount,
+                                    { color: item.balance >= 0 ? '#2196F3' : '#F44336' },
+                                ]}>
+                                    {formatAmount(item.balance)}
+                                </Text>
+                            </View>
+                        );
+                    })}
                 </View>
             )}
 
@@ -208,6 +236,17 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingVertical: 6,
+    },
+    accountRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 6,
+    },
+    ownerIndicator: {
+        width: 4,
+        height: 20,
+        borderRadius: 2,
+        marginRight: 10,
     },
     categoryName: {
         fontSize: 14,

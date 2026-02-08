@@ -1,6 +1,8 @@
+import 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import CalendarView from './components/CalendarView';
 import TodoList from './components/TodoList';
 import BudgetList from './components/BudgetList';
@@ -24,31 +26,37 @@ export default function App() {
 
   if (onboardingComplete === null) {
     return (
-      <SafeAreaProvider>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4A90E2" />
-        </View>
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4A90E2" />
+          </View>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     );
   }
 
   if (!onboardingComplete) {
     return (
-      <SafeAreaProvider>
-        <SafeAreaView style={styles.container}>
-          <OnboardingScreen onComplete={() => setOnboardingComplete(true)} />
-        </SafeAreaView>
-        <StatusBar style="auto" />
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <SafeAreaView style={styles.container}>
+            <OnboardingScreen onComplete={() => setOnboardingComplete(true)} />
+          </SafeAreaView>
+          <StatusBar style="auto" />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <AppDataProvider>
-        <AppContent />
-      </AppDataProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppDataProvider>
+          <AppContent />
+        </AppDataProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
