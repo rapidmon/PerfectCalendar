@@ -16,7 +16,6 @@
         "buildType": "apk"
       },
       "ios": {
-        "appleTeamId": "L993PK7S6Q",
         "image": "latest"
       }
     },
