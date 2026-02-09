@@ -22,6 +22,17 @@
     "production": {
       "ios": {
         "image": "latest"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "ehhwll0@icloud.com",
+        "ascAppId": "6758932337"
       }
     }
   }
