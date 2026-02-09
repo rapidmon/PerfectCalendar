@@ -238,17 +238,20 @@ function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals
         return { name: account, balance };
     });
 
-    // 이번 달 목표 잔여 금액 계산 (고정지출 제외 — 가계부 탭과 동일)
+    // 이번 달 목표 잔여 금액 계산 (저축, 고정지출 제외 — 가계부 탭과 동일)
     const now = new Date();
     const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthlyGoal = monthlyGoals[yearMonth] || 0;
     const monthPrefix = `${yearMonth}-`;
     const monthBudgets = budgets.filter(b => b.type === 'EXPENSE' && b.date.startsWith(monthPrefix));
-    const monthlyExpense = monthBudgets.reduce((sum, b) => sum + Math.abs(b.money), 0);
+    // 저축 제외한 지출
+    const monthlyExpenseExcludingSavings = monthBudgets
+        .filter(b => b.category !== '저축')
+        .reduce((sum, b) => sum + Math.abs(b.money), 0);
     const fixedExpense = monthBudgets
         .filter(b => fixedExpenseCategories.includes(b.category))
         .reduce((sum, b) => sum + Math.abs(b.money), 0);
-    const remaining = monthlyGoal - (monthlyExpense - fixedExpense);
+    const remaining = monthlyGoal - (monthlyExpenseExcludingSavings - fixedExpense);
 
     return (
         <FlexWidget

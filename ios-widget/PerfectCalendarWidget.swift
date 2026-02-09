@@ -487,11 +487,14 @@ struct BudgetTabContent: View {
         guard let goal = monthlyGoals[yearMonth], goal > 0 else { return nil }
         let monthPrefix = yearMonth + "-"
         let monthBudgets = budgets.filter { $0.type == "EXPENSE" && $0.date.hasPrefix(monthPrefix) }
-        let expense = monthBudgets.reduce(0) { $0 + abs($1.money) }
+        // 저축 제외한 지출 계산
+        let expenseExcludingSavings = monthBudgets
+            .filter { $0.category != "저축" }
+            .reduce(0) { $0 + abs($1.money) }
         let fixedExpense = monthBudgets
             .filter { fixedExpenseCategories.contains($0.category) }
             .reduce(0) { $0 + abs($1.money) }
-        return goal - (expense - fixedExpense)
+        return goal - (expenseExcludingSavings - fixedExpense)
     }
 
     var body: some View {

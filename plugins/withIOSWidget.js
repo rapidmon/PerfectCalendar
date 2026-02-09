@@ -182,6 +182,9 @@ function withWidgetTarget(config) {
               GENERATE_INFOPLIST_FILE: "NO",
               SWIFT_EMIT_LOC_STRINGS: "YES",
               CODE_SIGN_STYLE: "Automatic",
+              CODE_SIGNING_REQUIRED: "YES",
+              CODE_SIGNING_ALLOWED: "YES",
+              DEVELOPMENT_TEAM: "$(DEVELOPMENT_TEAM)",
               LD_RUNPATH_SEARCH_PATHS:
                 '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"',
               PRODUCT_NAME: `"$(TARGET_NAME)"`,
