@@ -56,7 +56,24 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "5c1f0ac3-2960-449b-af4c-324c8c1a9fb0"
+        "projectId": "5c1f0ac3-2960-449b-af4c-324c8c1a9fb0",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "PerfectCalendarWidgetExtension",
+                  "bundleIdentifier": "com.perfectcalendar.app.widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.perfectcalendar.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "owner": "limheerae"
