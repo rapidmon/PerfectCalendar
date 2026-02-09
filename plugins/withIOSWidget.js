@@ -176,7 +176,7 @@ function withWidgetTarget(config) {
               CODE_SIGN_ENTITLEMENTS: `"${WIDGET_NAME}/${WIDGET_NAME}.entitlements"`,
               INFOPLIST_FILE: `"${WIDGET_NAME}/Info.plist"`,
               PRODUCT_BUNDLE_IDENTIFIER: `"${widgetBundleId}"`,
-              MARKETING_VERSION: "1.0",
+              MARKETING_VERSION: "1.0.0",
               CURRENT_PROJECT_VERSION: "1",
               IPHONEOS_DEPLOYMENT_TARGET: "17.0",
               GENERATE_INFOPLIST_FILE: "NO",
