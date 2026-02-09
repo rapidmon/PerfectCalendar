@@ -136,25 +136,45 @@ function withWidgetTarget(config) {
       });
     }
 
-    // Swift 소스 파일을 위젯 타겟의 Sources 빌드 페이즈에 추가
+    // Sources 빌드 페이즈 추가 (컴파일할 소스 파일)
+    xcodeProject.addBuildPhase(
+      [`${WIDGET_NAME}/PerfectCalendarWidget.swift`],
+      "PBXSourcesBuildPhase",
+      "Sources",
+      widgetTarget.uuid
+    );
+
+    // Swift 소스 파일을 위젯 타겟에 추가
     xcodeProject.addSourceFile(
       "PerfectCalendarWidget.swift",
       { target: widgetTarget.uuid },
       widgetGroupResult.uuid
     );
 
+    // Frameworks 빌드 페이즈 추가
+    xcodeProject.addBuildPhase(
+      [],
+      "PBXFrameworksBuildPhase",
+      "Frameworks",
+      widgetTarget.uuid
+    );
+
     // 프레임워크 추가
     xcodeProject.addFramework("WidgetKit.framework", {
       target: widgetTarget.uuid,
       link: true,
+      embed: false,
     });
     xcodeProject.addFramework("SwiftUI.framework", {
       target: widgetTarget.uuid,
       link: true,
+      embed: false,
     });
     xcodeProject.addFramework("AppIntents.framework", {
       target: widgetTarget.uuid,
       link: true,
+      embed: false,
+      weak: true,
     });
 
     // 위젯 타겟 빌드 설정
@@ -189,6 +209,17 @@ function withWidgetTarget(config) {
                 '"$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"',
               PRODUCT_NAME: `"$(TARGET_NAME)"`,
               SKIP_INSTALL: "YES",
+              // 아키텍처 설정
+              ARCHS: '"$(ARCHS_STANDARD)"',
+              ONLY_ACTIVE_ARCH: "NO",
+              SDKROOT: "iphoneos",
+              // Swift 컴파일 설정
+              SWIFT_OPTIMIZATION_LEVEL: '"-O"',
+              SWIFT_COMPILATION_MODE: "wholemodule",
+              ENABLE_BITCODE: "NO",
+              // 빌드 설정
+              DEBUG_INFORMATION_FORMAT: '"dwarf-with-dsym"',
+              COPY_PHASE_STRIP: "NO",
             });
           }
         }
