@@ -1,283 +1,139 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
-    Dimensions,
-    Animated,
     Modal,
 } from 'react-native';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-
-export type TutorialStep =
-    | 'settings_button'      // 설정 버튼 하이라이트
-    | 'goal_item'            // 지출 목표 설정 하이라이트
-    | 'category_item'        // 카테고리 관리 하이라이트
-    | 'account_item'         // 통장 관리 하이라이트
-    | 'complete';            // 완료
-
-export interface HighlightPosition {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-}
+export type TutorialStep = 0 | 1 | 2 | 3 | 4; // 0: 설정버튼, 1: 목표, 2: 카테고리, 3: 통장, 4: 완료
 
 interface BudgetTutorialProps {
     visible: boolean;
-    currentStep: TutorialStep;
-    highlightPosition: HighlightPosition | null;
-    onStepAction: () => void;
+    step: TutorialStep;
+    onNext: () => void;
     onSkip: () => void;
 }
 
-const STEP_MESSAGES: Record<TutorialStep, { title: string; description: string }> = {
-    settings_button: {
+const STEP_INFO = [
+    {
         title: '가계부 설정',
-        description: '여기서 가계부의 다양한 설정을\n관리할 수 있어요.\n\n⚙ 버튼을 눌러보세요!',
+        description: '여기서 가계부의 다양한 설정을 관리할 수 있어요.',
+        action: '⚙ 버튼을 눌러보세요!',
     },
-    goal_item: {
+    {
         title: '지출 목표 설정',
-        description: '매월 지출 목표 금액을 설정하면\n예산 관리가 더 쉬워져요.\n\n눌러서 확인해보세요!',
+        description: '매월 지출 목표 금액을 설정하면 예산 관리가 더 쉬워져요.',
+        action: '다음',
     },
-    category_item: {
+    {
         title: '카테고리 관리',
-        description: '식비, 교통비 등 지출 카테고리를\n자유롭게 추가하고 관리할 수 있어요.\n\n눌러서 확인해보세요!',
+        description: '식비, 교통비 등 지출 카테고리를 자유롭게 추가하고 관리할 수 있어요.',
+        action: '다음',
     },
-    account_item: {
+    {
         title: '통장 관리',
-        description: '사용하는 통장들을 등록하면\n통장별 잔액 관리가 가능해요.\n\n눌러서 확인해보세요!',
+        description: '사용하는 통장들을 등록하면 통장별 잔액 관리가 가능해요.',
+        action: '완료',
     },
-    complete: {
-        title: '',
-        description: '',
-    },
-};
-
-const PADDING = 8;
+];
 
 export default function BudgetTutorial({
     visible,
-    currentStep,
-    highlightPosition,
-    onStepAction,
+    step,
+    onNext,
     onSkip,
 }: BudgetTutorialProps) {
-    const [fadeAnim] = useState(new Animated.Value(0));
+    if (!visible || step >= 4) return null;
 
-    useEffect(() => {
-        if (visible) {
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }).start();
-        } else {
-            fadeAnim.setValue(0);
-        }
-    }, [visible, fadeAnim]);
-
-    if (!visible || currentStep === 'complete' || !highlightPosition) {
-        return null;
-    }
-
-    const message = STEP_MESSAGES[currentStep];
-
-    // 하이라이트 영역 계산 (패딩 포함)
-    const holeX = highlightPosition.x - PADDING;
-    const holeY = highlightPosition.y - PADDING;
-    const holeWidth = highlightPosition.width + PADDING * 2;
-    const holeHeight = highlightPosition.height + PADDING * 2;
-
-    // 설명 박스 위치 계산
-    const isUpperHalf = holeY < SCREEN_HEIGHT / 2;
-    const tooltipTop = isUpperHalf
-        ? holeY + holeHeight + 20
-        : undefined;
-    const tooltipBottom = isUpperHalf
-        ? undefined
-        : SCREEN_HEIGHT - holeY + 20;
-
-    // 스텝 번호 계산
-    const stepNumber = currentStep === 'settings_button' ? 1
-        : currentStep === 'goal_item' ? 2
-        : currentStep === 'category_item' ? 3
-        : 4;
+    const info = STEP_INFO[step];
 
     return (
-        <Modal visible={visible} transparent animationType="none">
-        <Animated.View
-            style={[styles.container, { opacity: fadeAnim }]}
-            pointerEvents="box-none"
-        >
-            {/* 상단 오버레이 */}
-            <View
-                style={[
-                    styles.overlay,
-                    { top: 0, left: 0, right: 0, height: holeY }
-                ]}
-            />
+        <Modal visible={visible} transparent animationType="fade">
+            <View style={styles.overlay}>
+                <View style={styles.card}>
+                    <View style={styles.stepBadge}>
+                        <Text style={styles.stepText}>{step + 1} / 4</Text>
+                    </View>
 
-            {/* 좌측 오버레이 */}
-            <View
-                style={[
-                    styles.overlay,
-                    { top: holeY, left: 0, width: holeX, height: holeHeight }
-                ]}
-            />
+                    <Text style={styles.title}>{info.title}</Text>
+                    <Text style={styles.description}>{info.description}</Text>
 
-            {/* 우측 오버레이 */}
-            <View
-                style={[
-                    styles.overlay,
-                    {
-                        top: holeY,
-                        left: holeX + holeWidth,
-                        right: 0,
-                        height: holeHeight
-                    }
-                ]}
-            />
+                    <TouchableOpacity style={styles.nextButton} onPress={onNext}>
+                        <Text style={styles.nextButtonText}>{info.action}</Text>
+                    </TouchableOpacity>
 
-            {/* 하단 오버레이 */}
-            <View
-                style={[
-                    styles.overlay,
-                    {
-                        top: holeY + holeHeight,
-                        left: 0,
-                        right: 0,
-                        bottom: 0
-                    }
-                ]}
-            />
-
-            {/* 하이라이트 테두리 */}
-            <View
-                style={[
-                    styles.highlightBorder,
-                    {
-                        top: holeY,
-                        left: holeX,
-                        width: holeWidth,
-                        height: holeHeight,
-                    }
-                ]}
-            />
-
-            {/* 하이라이트 영역 터치 감지 */}
-            <TouchableOpacity
-                style={[
-                    styles.highlightTouchArea,
-                    {
-                        top: holeY,
-                        left: holeX,
-                        width: holeWidth,
-                        height: holeHeight,
-                    }
-                ]}
-                activeOpacity={0.8}
-                onPress={onStepAction}
-            />
-
-            {/* 설명 박스 */}
-            <View
-                style={[
-                    styles.tooltip,
-                    {
-                        top: tooltipTop,
-                        bottom: tooltipBottom,
-                    }
-                ]}
-            >
-                <View style={styles.stepIndicator}>
-                    <Text style={styles.stepText}>{stepNumber} / 4</Text>
+                    <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+                        <Text style={styles.skipButtonText}>건너뛰기</Text>
+                    </TouchableOpacity>
                 </View>
-                <Text style={styles.tooltipTitle}>{message.title}</Text>
-                <Text style={styles.tooltipDescription}>{message.description}</Text>
-
-                <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
-                    <Text style={styles.skipButtonText}>튜토리얼 건너뛰기</Text>
-                </TouchableOpacity>
             </View>
-        </Animated.View>
         </Modal>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 1000,
-    },
     overlay: {
-        position: 'absolute',
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
     },
-    highlightBorder: {
-        position: 'absolute',
-        borderWidth: 2,
-        borderColor: '#4A90E2',
-        borderRadius: 12,
-        backgroundColor: 'transparent',
-    },
-    highlightTouchArea: {
-        position: 'absolute',
-        backgroundColor: 'transparent',
-    },
-    tooltip: {
-        position: 'absolute',
-        left: 24,
-        right: 24,
+    card: {
         backgroundColor: '#fff',
         borderRadius: 16,
-        padding: 20,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
+        padding: 24,
+        width: '100%',
+        maxWidth: 320,
+        alignItems: 'center',
     },
-    stepIndicator: {
-        position: 'absolute',
-        top: -12,
-        right: 20,
+    stepBadge: {
         backgroundColor: '#4A90E2',
         paddingHorizontal: 12,
         paddingVertical: 4,
         borderRadius: 12,
+        marginBottom: 16,
     },
     stepText: {
         color: '#fff',
         fontSize: 12,
         fontWeight: 'bold',
     },
-    tooltipTitle: {
-        fontSize: 18,
+    title: {
+        fontSize: 20,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 8,
+        marginBottom: 12,
+        textAlign: 'center',
     },
-    tooltipDescription: {
-        fontSize: 14,
+    description: {
+        fontSize: 15,
         color: '#666',
         lineHeight: 22,
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    nextButton: {
+        backgroundColor: '#4A90E2',
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 10,
+        width: '100%',
+        alignItems: 'center',
+    },
+    nextButtonText: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
     },
     skipButton: {
-        marginTop: 16,
-        alignSelf: 'center',
+        marginTop: 12,
         paddingVertical: 8,
-        paddingHorizontal: 16,
     },
     skipButtonText: {
-        fontSize: 13,
         color: '#999',
-        textDecorationLine: 'underline',
+        fontSize: 14,
     },
 });

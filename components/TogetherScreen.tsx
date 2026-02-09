@@ -361,23 +361,6 @@ export default function TogetherScreen() {
               </View>
             </View>
 
-            <View style={styles.useCaseContainer}>
-              <Text style={styles.useCaseTitle}>추천 활용 사례</Text>
-              <View style={styles.useCaseList}>
-                <View style={styles.useCaseItem}>
-                  <Text style={styles.useCaseEmoji}>💑</Text>
-                  <Text style={styles.useCaseText}>커플 가계부</Text>
-                </View>
-                <View style={styles.useCaseItem}>
-                  <Text style={styles.useCaseEmoji}>👨‍👩‍👧‍👦</Text>
-                  <Text style={styles.useCaseText}>가족 살림</Text>
-                </View>
-                <View style={styles.useCaseItem}>
-                  <Text style={styles.useCaseEmoji}>🏠</Text>
-                  <Text style={styles.useCaseText}>룸메이트 공과금</Text>
-                </View>
-              </View>
-            </View>
           </View>
         </>
       )}
@@ -767,33 +750,5 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 19,
-  },
-  useCaseContainer: {
-    marginTop: 20,
-    backgroundColor: '#FFF8E7',
-    borderRadius: 12,
-    padding: 16,
-  },
-  useCaseTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8B6914',
-    marginBottom: 12,
-  },
-  useCaseList: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  useCaseItem: {
-    alignItems: 'center',
-  },
-  useCaseEmoji: {
-    fontSize: 28,
-    marginBottom: 6,
-  },
-  useCaseText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
   },
 });

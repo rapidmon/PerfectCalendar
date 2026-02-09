@@ -1,12 +1,12 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Modal } from 'react-native';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal } from 'react-native';
 import MonthlySummaryCard from './MonthlySummaryCard';
 import MonthlyChartCard from './MonthlyChartCard';
 import SetGoalModal from './SetGoalModal';
 import CategoryManageModal from './CategoryManageModal';
 import AccountManageModal from './AccountManageModal';
 import OverallStatsModal from './OverallStatsModal';
-import BudgetTutorial, { TutorialStep, HighlightPosition } from './BudgetTutorial';
+import BudgetTutorial, { TutorialStep } from './BudgetTutorial';
 import { AccountBalances } from '../types/budget';
 import { useAppData } from '../contexts/AppDataContext';
 import { computeMonthlyStats, getMultiMonthChartData, computeAccountBalances } from '../utils/budgetAnalytics';
@@ -28,74 +28,37 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     const [accountManageModalVisible, setAccountManageModalVisible] = useState(false);
     const [overallStatsVisible, setOverallStatsVisible] = useState(false);
 
-    // 튜토리얼 상태
-    const [tutorialActive, setTutorialActive] = useState(false);
-    const [tutorialStep, setTutorialStep] = useState<TutorialStep>('settings_button');
-    const [highlightPosition, setHighlightPosition] = useState<HighlightPosition | null>(null);
-
-    // Refs for measuring element positions
-    const settingsButtonRef = useRef<View>(null);
-    const goalItemRef = useRef<View>(null);
-    const categoryItemRef = useRef<View>(null);
-    const accountItemRef = useRef<View>(null);
+    // 튜토리얼 상태 (0: 설정버튼, 1: 목표, 2: 카테고리, 3: 통장, 4: 완료)
+    const [tutorialStep, setTutorialStep] = useState<TutorialStep>(4); // 4 = 완료(비활성)
 
     // 처음 가계부 탭 방문 시 튜토리얼 시작
     useEffect(() => {
         const checkTutorial = async () => {
             const completed = await loadBudgetTutorialComplete();
             if (!completed) {
-                // 약간의 딜레이 후 튜토리얼 시작 (화면 렌더링 대기)
-                setTimeout(() => {
-                    setTutorialActive(true);
-                    measureSettingsButton();
-                }, 500);
+                setTimeout(() => setTutorialStep(0), 300);
             }
         };
         checkTutorial();
     }, []);
 
-    // 설정 버튼 위치 측정
-    const measureSettingsButton = useCallback(() => {
-        if (settingsButtonRef.current) {
-            settingsButtonRef.current.measureInWindow((x, y, width, height) => {
-                setHighlightPosition({ x, y, width, height });
-            });
-        }
-    }, []);
-
-    // 메뉴 아이템 위치 측정
-    const measureMenuItem = useCallback((ref: React.RefObject<View | null>) => {
-        if (ref.current) {
-            ref.current.measureInWindow((x, y, width, height) => {
-                setHighlightPosition({ x, y, width, height });
-            });
-        }
-    }, []);
-
-    // 튜토리얼 단계별 액션 처리
-    const handleTutorialAction = useCallback(() => {
-        if (tutorialStep === 'settings_button') {
-            // 설정 메뉴 열기
+    const handleTutorialNext = useCallback(() => {
+        if (tutorialStep === 0) {
+            // 설정 버튼 설명 후 → 설정 메뉴 열고 목표 설명
             setSettingsMenuVisible(true);
-            setTutorialStep('goal_item');
-            // 메뉴가 열린 후 지출 목표 설정 위치 측정
-            setTimeout(() => measureMenuItem(goalItemRef), 300);
-        } else if (tutorialStep === 'goal_item') {
-            setTutorialStep('category_item');
-            setTimeout(() => measureMenuItem(categoryItemRef), 100);
-        } else if (tutorialStep === 'category_item') {
-            setTutorialStep('account_item');
-            setTimeout(() => measureMenuItem(accountItemRef), 100);
-        } else if (tutorialStep === 'account_item') {
-            // 튜토리얼 완료
+            setTutorialStep(1);
+        } else if (tutorialStep === 1) {
+            setTutorialStep(2);
+        } else if (tutorialStep === 2) {
+            setTutorialStep(3);
+        } else if (tutorialStep === 3) {
+            // 완료
             completeTutorial();
         }
-    }, [tutorialStep, measureMenuItem]);
+    }, [tutorialStep]);
 
-    // 튜토리얼 완료 또는 건너뛰기
     const completeTutorial = useCallback(async () => {
-        setTutorialActive(false);
-        setTutorialStep('complete');
+        setTutorialStep(4);
         setSettingsMenuVisible(false);
         await saveBudgetTutorialComplete();
     }, []);
@@ -142,7 +105,6 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         }, 200);
     }, []);
 
-    // Memoized analytics - recomputed only when dependencies change
     const stats = useMemo(
         () => computeMonthlyStats(budgets, viewYear, viewMonth, fixedCategories),
         [budgets, viewYear, viewMonth, fixedCategories]
@@ -157,6 +119,8 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         () => computeAccountBalances(budgets, accountBalances, accounts, isGroupConnected ? accountOwners : undefined),
         [budgets, accountBalances, accounts, accountOwners, isGroupConnected]
     );
+
+    const isTutorialActive = tutorialStep < 4;
 
     return (
         <View style={styles.container}>
@@ -177,20 +141,12 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                         <Text style={styles.navButtonText}>▶</Text>
                     </TouchableOpacity>
                 </View>
-                <View ref={settingsButtonRef} collapsable={false}>
-                    <TouchableOpacity
-                        style={styles.settingsButton}
-                        onPress={() => {
-                            if (tutorialActive && tutorialStep === 'settings_button') {
-                                handleTutorialAction();
-                            } else {
-                                setSettingsMenuVisible(true);
-                            }
-                        }}
-                    >
-                        <Text style={styles.settingsButtonText}>⚙</Text>
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                    style={styles.settingsButton}
+                    onPress={() => setSettingsMenuVisible(true)}
+                >
+                    <Text style={styles.settingsButtonText}>⚙</Text>
+                </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -243,78 +199,65 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 transparent
                 animationType="fade"
                 onRequestClose={() => {
-                    if (!tutorialActive) {
+                    if (!isTutorialActive) {
                         setSettingsMenuVisible(false);
                     }
                 }}
             >
                 <TouchableOpacity
-                    style={[
-                        styles.menuOverlay,
-                        tutorialActive && styles.menuOverlayTutorial
-                    ]}
+                    style={styles.menuOverlay}
                     activeOpacity={1}
                     onPress={() => {
-                        if (!tutorialActive) {
+                        if (!isTutorialActive) {
                             setSettingsMenuVisible(false);
                         }
                     }}
                 >
                     <View style={styles.menuContainer}>
-                        <View ref={goalItemRef} collapsable={false}>
-                            <TouchableOpacity
-                                style={styles.menuItem}
-                                onPress={() => {
-                                    if (tutorialActive && tutorialStep === 'goal_item') {
-                                        handleTutorialAction();
-                                    } else {
-                                        openSettingsItem('goal');
-                                    }
-                                }}
-                            >
-                                <Text style={styles.menuItemText}>지출 목표 설정</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={[
+                                styles.menuItem,
+                                isTutorialActive && tutorialStep === 1 && styles.menuItemHighlight
+                            ]}
+                            onPress={() => {
+                                if (!isTutorialActive) openSettingsItem('goal');
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>지출 목표 설정</Text>
+                        </TouchableOpacity>
                         <View style={styles.menuDivider} />
-                        <View ref={categoryItemRef} collapsable={false}>
-                            <TouchableOpacity
-                                style={styles.menuItem}
-                                onPress={() => {
-                                    if (tutorialActive && tutorialStep === 'category_item') {
-                                        handleTutorialAction();
-                                    } else {
-                                        openSettingsItem('category');
-                                    }
-                                }}
-                            >
-                                <Text style={styles.menuItemText}>카테고리 관리</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={[
+                                styles.menuItem,
+                                isTutorialActive && tutorialStep === 2 && styles.menuItemHighlight
+                            ]}
+                            onPress={() => {
+                                if (!isTutorialActive) openSettingsItem('category');
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>카테고리 관리</Text>
+                        </TouchableOpacity>
                         <View style={styles.menuDivider} />
-                        <View ref={accountItemRef} collapsable={false}>
-                            <TouchableOpacity
-                                style={styles.menuItem}
-                                onPress={() => {
-                                    if (tutorialActive && tutorialStep === 'account_item') {
-                                        handleTutorialAction();
-                                    } else {
-                                        openSettingsItem('accountManage');
-                                    }
-                                }}
-                            >
-                                <Text style={styles.menuItemText}>통장 관리</Text>
-                            </TouchableOpacity>
-                        </View>
+                        <TouchableOpacity
+                            style={[
+                                styles.menuItem,
+                                isTutorialActive && tutorialStep === 3 && styles.menuItemHighlight
+                            ]}
+                            onPress={() => {
+                                if (!isTutorialActive) openSettingsItem('accountManage');
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>통장 관리</Text>
+                        </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
             </Modal>
 
-            {/* 튜토리얼 오버레이 */}
+            {/* 튜토리얼 */}
             <BudgetTutorial
-                visible={tutorialActive}
-                currentStep={tutorialStep}
-                highlightPosition={highlightPosition}
-                onStepAction={handleTutorialAction}
+                visible={isTutorialActive}
+                step={tutorialStep}
+                onNext={handleTutorialNext}
                 onSkip={completeTutorial}
             />
         </View>
@@ -324,10 +267,6 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-    },
-    loadingContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     monthNav: {
         flexDirection: 'row',
@@ -386,9 +325,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    menuOverlayTutorial: {
-        backgroundColor: 'transparent',
-    },
     menuContainer: {
         backgroundColor: '#fff',
         borderRadius: 12,
@@ -399,6 +335,9 @@ const styles = StyleSheet.create({
     menuItem: {
         paddingVertical: 16,
         paddingHorizontal: 20,
+    },
+    menuItemHighlight: {
+        backgroundColor: '#E8F4FD',
     },
     menuItemText: {
         fontSize: 15,
