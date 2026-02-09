@@ -138,7 +138,7 @@ function withWidgetTarget(config) {
 
     // Swift 소스 파일을 위젯 타겟의 Sources 빌드 페이즈에 추가
     xcodeProject.addSourceFile(
-      `${WIDGET_NAME}/PerfectCalendarWidget.swift`,
+      "PerfectCalendarWidget.swift",
       { target: widgetTarget.uuid },
       widgetGroupResult.uuid
     );
