@@ -7,7 +7,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  Share
+  Share,
+  ScrollView
 } from 'react-native';
 import {
   isGroupConnected,
@@ -294,7 +295,7 @@ export default function TogetherScreen() {
 
   // not_connected 상태
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>함께해요</Text>
         <Text style={styles.subtitle}>
@@ -303,21 +304,82 @@ export default function TogetherScreen() {
       </View>
 
       {!showCreateInput && !showJoinInput && (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => setShowCreateInput(true)}
-          >
-            <Text style={styles.primaryButtonText}>공유 코드 만들기</Text>
-          </TouchableOpacity>
+        <>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => setShowCreateInput(true)}
+            >
+              <Text style={styles.primaryButtonText}>공유 코드 만들기</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => setShowJoinInput(true)}
-          >
-            <Text style={styles.secondaryButtonText}>코드로 참여하기</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => setShowJoinInput(true)}
+            >
+              <Text style={styles.secondaryButtonText}>코드로 참여하기</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* 사용 예시 섹션 */}
+          <View style={styles.exampleSection}>
+            <Text style={styles.exampleSectionTitle}>이렇게 사용해요</Text>
+
+            <View style={styles.exampleCard}>
+              <View style={styles.exampleIconContainer}>
+                <Text style={styles.exampleIcon}>1</Text>
+              </View>
+              <View style={styles.exampleContent}>
+                <Text style={styles.exampleTitle}>공유 코드 만들기</Text>
+                <Text style={styles.exampleDesc}>
+                  먼저 한 사람이 코드를 생성하고{'\n'}상대방에게 공유해요
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.exampleCard}>
+              <View style={styles.exampleIconContainer}>
+                <Text style={styles.exampleIcon}>2</Text>
+              </View>
+              <View style={styles.exampleContent}>
+                <Text style={styles.exampleTitle}>코드로 참여하기</Text>
+                <Text style={styles.exampleDesc}>
+                  상대방은 받은 6자리 코드를{'\n'}입력해서 참여해요
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.exampleCard}>
+              <View style={styles.exampleIconContainer}>
+                <Text style={styles.exampleIcon}>3</Text>
+              </View>
+              <View style={styles.exampleContent}>
+                <Text style={styles.exampleTitle}>실시간 동기화</Text>
+                <Text style={styles.exampleDesc}>
+                  가계부, 할 일, 통장이{'\n'}자동으로 공유돼요
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.useCaseContainer}>
+              <Text style={styles.useCaseTitle}>추천 활용 사례</Text>
+              <View style={styles.useCaseList}>
+                <View style={styles.useCaseItem}>
+                  <Text style={styles.useCaseEmoji}>💑</Text>
+                  <Text style={styles.useCaseText}>커플 가계부</Text>
+                </View>
+                <View style={styles.useCaseItem}>
+                  <Text style={styles.useCaseEmoji}>👨‍👩‍👧‍👦</Text>
+                  <Text style={styles.useCaseText}>가족 살림</Text>
+                </View>
+                <View style={styles.useCaseItem}>
+                  <Text style={styles.useCaseEmoji}>🏠</Text>
+                  <Text style={styles.useCaseText}>룸메이트 공과금</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </>
       )}
 
       {showCreateInput && (
@@ -418,7 +480,7 @@ export default function TogetherScreen() {
           </View>
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -660,5 +722,78 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  exampleSection: {
+    marginTop: 32,
+  },
+  exampleSectionTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  exampleCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  exampleIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#4A90E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+  },
+  exampleIcon: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  exampleContent: {
+    flex: 1,
+  },
+  exampleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  exampleDesc: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 19,
+  },
+  useCaseContainer: {
+    marginTop: 20,
+    backgroundColor: '#FFF8E7',
+    borderRadius: 12,
+    padding: 16,
+  },
+  useCaseTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#8B6914',
+    marginBottom: 12,
+  },
+  useCaseList: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  useCaseItem: {
+    alignItems: 'center',
+  },
+  useCaseEmoji: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  useCaseText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
   },
 });

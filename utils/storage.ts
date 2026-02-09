@@ -26,6 +26,7 @@ const MONTHLY_GOALS_KEY = '@monthly_goals';
 const ACCOUNTS_KEY = '@accounts';
 const ACCOUNT_BALANCES_KEY = '@account_balances';
 const ONBOARDING_COMPLETE_KEY = '@onboarding_complete';
+const BUDGET_TUTORIAL_COMPLETE_KEY = '@budget_tutorial_complete';
 const INVESTMENTS_KEY = '@investments';
 const SAVINGS_KEY = '@savings';
 
@@ -228,6 +229,26 @@ export const loadOnboardingComplete = async (): Promise<boolean> => {
         return value === 'true';
     } catch (e) {
         console.error('온보딩 완료 불러오기 실패:', e);
+        return false;
+    }
+};
+
+// 가계부 튜토리얼 완료 저장
+export const saveBudgetTutorialComplete = async (): Promise<void> => {
+    try {
+        await AsyncStorage.setItem(BUDGET_TUTORIAL_COMPLETE_KEY, 'true');
+    } catch (e) {
+        console.error('가계부 튜토리얼 완료 저장 실패:', e);
+    }
+};
+
+// 가계부 튜토리얼 완료 여부 불러오기
+export const loadBudgetTutorialComplete = async (): Promise<boolean> => {
+    try {
+        const value = await AsyncStorage.getItem(BUDGET_TUTORIAL_COMPLETE_KEY);
+        return value === 'true';
+    } catch (e) {
+        console.error('가계부 튜토리얼 완료 불러오기 실패:', e);
         return false;
     }
 };
