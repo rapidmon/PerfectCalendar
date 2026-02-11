@@ -346,10 +346,14 @@ export class AppDataStore {
     }
 
     async disconnectGroup(): Promise<void> {
-        // 나가기 전에 그룹 코드와 UID 저장
+        // 나가기 전에 그룹 코드와 UID, 현재 통장 데이터를 저장
         const groupCode = this._groupCode;
         const uid = getCurrentUid();
+        const prevAccounts = [...this._accounts];
+        const prevBalances = { ...this._accountBalances };
+        const prevOwners = { ...this._accountOwners };
 
+        // 구독 먼저 해제 (Firebase 변경 감지로 데이터 덮어쓰기 방지)
         this.stopGroupSync();
         this._isGroupConnected = false;
         this._groupCode = null;
@@ -375,19 +379,23 @@ export class AppDataStore {
                 this._todos = myTodos;
 
                 // 내 통장만 유지 (소유자 기준 필터링)
+                // 소유자 미지정(undefined) 통장도 내 것으로 간주
                 if (uid) {
-                    const myAccounts = this._accounts.filter(acc => this._accountOwners[acc] === uid);
+                    const myAccounts = prevAccounts.filter(acc =>
+                        !prevOwners[acc] || prevOwners[acc] === uid
+                    );
                     const myBalances: AccountBalances = {};
                     for (const acc of myAccounts) {
-                        if (this._accountBalances[acc] !== undefined) {
-                            myBalances[acc] = this._accountBalances[acc];
+                        if (prevBalances[acc] !== undefined) {
+                            myBalances[acc] = prevBalances[acc];
                         }
                     }
                     this._accounts = myAccounts;
                     this._accountBalances = myBalances;
                 } else {
-                    this._accounts = [];
-                    this._accountBalances = {};
+                    // uid 없으면 전체 유지 (소유자 구분 불가)
+                    this._accounts = prevAccounts;
+                    this._accountBalances = prevBalances;
                 }
                 this._accountOwners = {};
 

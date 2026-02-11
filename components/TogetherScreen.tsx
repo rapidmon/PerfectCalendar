@@ -234,8 +234,10 @@ export default function TogetherScreen() {
           onPress: async () => {
             groupUnsubscribe?.();
             setGroupUnsubscribe(null);
-            await leaveGroup();
+            // disconnectGroup 먼저 (구독 해제 + 내 데이터 보존)
+            // leaveGroup은 그 후 (Firebase에서 멤버 제거)
             await store.disconnectGroup();
+            await leaveGroup();
             setGroupCode('');
             setGroupInfo(null);
             setMode('not_connected');
