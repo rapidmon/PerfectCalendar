@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIn
 import AddTodoModal from './AddTodoModal';
 import TodoActionModal from './TodoActionModal';
 import { Todo, TodoType } from '../types/todo';
-import { useAppData } from '../contexts/AppDataContext';
+import { useStore, useTodos, useGroup } from '../contexts/AppDataContext';
 import { getMemberColor } from '../utils/memberColors';
 
 interface TodoFullListProps {
@@ -98,8 +98,10 @@ const formatLocalDate = (date: Date) => {
 };
 
 export default function TodoFullList({ selectedDate }: TodoFullListProps) {
-    const { todos, store, isGroupConnected, memberNames, memberColors } = useAppData();
-    const memberUids = Object.keys(memberNames);
+    const { store } = useStore();
+    const { todos } = useTodos();
+    const { isGroupConnected, memberNames, memberColors } = useGroup();
+    const memberUids = useMemo(() => Object.keys(memberNames), [memberNames]);
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);

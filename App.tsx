@@ -11,7 +11,7 @@ import BudgetFullList from './components/BudgetFullList';
 import OnboardingScreen from './components/OnboardingScreen';
 import TogetherScreen from './components/TogetherScreen';
 import InvestmentScreen from './components/InvestmentScreen';
-import { AppDataProvider, useAppData } from './contexts/AppDataContext';
+import { AppDataProvider, useStore } from './contexts/AppDataContext';
 import { useState, useEffect } from 'react';
 import { loadOnboardingComplete } from './utils/storage';
 
@@ -61,7 +61,7 @@ export default function App() {
 }
 
 function AppContent() {
-  const { isLoaded } = useAppData();
+  const { isLoaded } = useStore();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeTab, setActiveTab] = useState<TabType>('home');
 

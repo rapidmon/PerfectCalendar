@@ -9,7 +9,7 @@ import OverallStatsModal from './OverallStatsModal';
 import BudgetTutorial, { TutorialStep } from './BudgetTutorial';
 import { AccountBalances } from '../types/budget';
 import { AccountOwnership } from '../firebase';
-import { useAppData } from '../contexts/AppDataContext';
+import { useStore, useBudgets, useAccounts, useGroup } from '../contexts/AppDataContext';
 import { computeMonthlyStats, getMultiMonthChartData, computeAccountBalances } from '../utils/budgetAnalytics';
 import { loadBudgetTutorialComplete, saveBudgetTutorialComplete } from '../utils/storage';
 
@@ -18,7 +18,10 @@ interface BudgetFullListProps {
 }
 
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
-    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, accountOwners, memberNames, memberColors, isGroupConnected, store } = useAppData();
+    const { store } = useStore();
+    const { budgets, categories, fixedCategories, monthlyGoals } = useBudgets();
+    const { accounts, accountBalances, accountOwners } = useAccounts();
+    const { memberNames, memberColors, isGroupConnected } = useGroup();
 
     const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(selectedDate.getMonth() + 1);

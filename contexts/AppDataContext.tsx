@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { AppDataStore } from '../stores/AppDataStore';
 import { Todo } from '../types/todo';
 import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
@@ -6,39 +6,63 @@ import { Investment } from '../types/investment';
 import { Savings } from '../types/savings';
 import { AccountOwnership } from '../firebase';
 
-/**
- * AppData - Context value interface exposing store state and the store instance.
- *
- * Components read state properties for rendering (triggers re-render on change)
- * and call store methods for mutations (e.g., store.addTodo(...)).
- */
-export interface AppData {
+// ── Domain-specific context interfaces ──────────────────────
+
+interface StoreData {
+    store: AppDataStore;
+    isLoaded: boolean;
+}
+
+interface TodoData {
     todos: Todo[];
+}
+
+interface BudgetData {
     budgets: Budget[];
     categories: string[];
-    accounts: string[];
     fixedCategories: string[];
     monthlyGoals: MonthlyGoal;
+}
+
+interface AccountData {
+    accounts: string[];
     accountBalances: AccountBalances;
     accountOwners: AccountOwnership;
-    memberNames: { [uid: string]: string };
-    memberColors: { [uid: string]: string };
-    investments: Investment[];
-    savings: Savings[];
-    isLoaded: boolean;
+}
+
+interface GroupData {
     isGroupConnected: boolean;
     groupCode: string | null;
     userName: string | null;
-    store: AppDataStore;
+    memberNames: { [uid: string]: string };
+    memberColors: { [uid: string]: string };
 }
 
-const AppDataContext = createContext<AppData | null>(null);
+interface InvestmentData {
+    investments: Investment[];
+    savings: Savings[];
+}
+
+// ── Backward-compatible combined interface ──────────────────
+
+export interface AppData extends StoreData, TodoData, BudgetData, AccountData, GroupData, InvestmentData {}
+
+// ── Contexts ────────────────────────────────────────────────
+
+const StoreContext = createContext<StoreData | null>(null);
+const TodoContext = createContext<TodoData | null>(null);
+const BudgetContext = createContext<BudgetData | null>(null);
+const AccountContext = createContext<AccountData | null>(null);
+const GroupContext = createContext<GroupData | null>(null);
+const InvestmentContext = createContext<InvestmentData | null>(null);
+
+// ── Provider ────────────────────────────────────────────────
 
 /**
  * AppDataProvider - Bridges the OOP AppDataStore singleton with React's rendering.
  *
- * Subscribes to store notifications and triggers re-renders via a revision counter
- * so that consuming components always see the latest state snapshot.
+ * Each domain context is memoized independently so that a change in one domain
+ * (e.g. budgets) does NOT trigger re-renders in unrelated consumers (e.g. TodoList).
  */
 export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const storeRef = useRef(AppDataStore.getInstance());
@@ -51,39 +75,123 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         return unsubscribe;
     }, [store]);
 
-    const value: AppData = {
-        todos: store.todos,
-        budgets: store.budgets,
-        categories: store.categories,
-        accounts: store.accounts,
-        fixedCategories: store.fixedCategories,
-        monthlyGoals: store.monthlyGoals,
-        accountBalances: store.accountBalances,
-        accountOwners: store.accountOwners,
-        memberNames: store.memberNames,
-        memberColors: store.memberColors,
-        investments: store.investments,
-        savings: store.savings,
-        isLoaded: store.isLoaded,
-        isGroupConnected: store.isGroupConnected,
-        groupCode: store.groupCode,
-        userName: store.userName,
-        store,
-    };
+    const storeValue = useMemo<StoreData>(
+        () => ({ store, isLoaded: store.isLoaded }),
+        [store, store.isLoaded]
+    );
+
+    const todoValue = useMemo<TodoData>(
+        () => ({ todos: store.todos }),
+        [store.todos]
+    );
+
+    const budgetValue = useMemo<BudgetData>(
+        () => ({
+            budgets: store.budgets,
+            categories: store.categories,
+            fixedCategories: store.fixedCategories,
+            monthlyGoals: store.monthlyGoals,
+        }),
+        [store.budgets, store.categories, store.fixedCategories, store.monthlyGoals]
+    );
+
+    const accountValue = useMemo<AccountData>(
+        () => ({
+            accounts: store.accounts,
+            accountBalances: store.accountBalances,
+            accountOwners: store.accountOwners,
+        }),
+        [store.accounts, store.accountBalances, store.accountOwners]
+    );
+
+    const groupValue = useMemo<GroupData>(
+        () => ({
+            isGroupConnected: store.isGroupConnected,
+            groupCode: store.groupCode,
+            userName: store.userName,
+            memberNames: store.memberNames,
+            memberColors: store.memberColors,
+        }),
+        [store.isGroupConnected, store.groupCode, store.userName, store.memberNames, store.memberColors]
+    );
+
+    const investmentValue = useMemo<InvestmentData>(
+        () => ({
+            investments: store.investments,
+            savings: store.savings,
+        }),
+        [store.investments, store.savings]
+    );
 
     return (
-        <AppDataContext.Provider value={value}>
+        <StoreContext.Provider value={storeValue}>
+        <TodoContext.Provider value={todoValue}>
+        <BudgetContext.Provider value={budgetValue}>
+        <AccountContext.Provider value={accountValue}>
+        <GroupContext.Provider value={groupValue}>
+        <InvestmentContext.Provider value={investmentValue}>
             {children}
-        </AppDataContext.Provider>
+        </InvestmentContext.Provider>
+        </GroupContext.Provider>
+        </AccountContext.Provider>
+        </BudgetContext.Provider>
+        </TodoContext.Provider>
+        </StoreContext.Provider>
     );
 }
 
+// ── Domain-specific hooks ───────────────────────────────────
+
+export function useStore(): StoreData {
+    const ctx = useContext(StoreContext);
+    if (!ctx) throw new Error('useStore must be used within AppDataProvider');
+    return ctx;
+}
+
+export function useTodos(): TodoData {
+    const ctx = useContext(TodoContext);
+    if (!ctx) throw new Error('useTodos must be used within AppDataProvider');
+    return ctx;
+}
+
+export function useBudgets(): BudgetData {
+    const ctx = useContext(BudgetContext);
+    if (!ctx) throw new Error('useBudgets must be used within AppDataProvider');
+    return ctx;
+}
+
+export function useAccounts(): AccountData {
+    const ctx = useContext(AccountContext);
+    if (!ctx) throw new Error('useAccounts must be used within AppDataProvider');
+    return ctx;
+}
+
+export function useGroup(): GroupData {
+    const ctx = useContext(GroupContext);
+    if (!ctx) throw new Error('useGroup must be used within AppDataProvider');
+    return ctx;
+}
+
+export function useInvestments(): InvestmentData {
+    const ctx = useContext(InvestmentContext);
+    if (!ctx) throw new Error('useInvestments must be used within AppDataProvider');
+    return ctx;
+}
+
+// ── Backward-compatible hook ────────────────────────────────
+
 /**
- * useAppData - Hook to access centralized app data and the store instance.
- * Must be used within an AppDataProvider.
+ * useAppData - Combines all domain contexts into a single object.
+ * Prefer domain-specific hooks (useTodos, useBudgets, etc.) to avoid
+ * unnecessary re-renders.
  */
 export function useAppData(): AppData {
-    const ctx = useContext(AppDataContext);
-    if (!ctx) throw new Error('useAppData must be used within AppDataProvider');
-    return ctx;
+    return {
+        ...useStore(),
+        ...useTodos(),
+        ...useBudgets(),
+        ...useAccounts(),
+        ...useGroup(),
+        ...useInvestments(),
+    };
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, RefreshControl } from 'react-native';
-import { useAppData } from '../contexts/AppDataContext';
+import { useStore, useInvestments } from '../contexts/AppDataContext';
 import { Investment, StockPrice } from '../types/investment';
 import { Savings } from '../types/savings';
 import { getMultipleStockPrices } from '../services/stockService';
@@ -13,7 +13,8 @@ import InvestmentActionModal from './InvestmentActionModal';
 import SavingsActionModal from './SavingsActionModal';
 
 export default function InvestmentScreen() {
-    const { investments, savings, store } = useAppData();
+    const { store } = useStore();
+    const { investments, savings } = useInvestments();
 
     const [prices, setPrices] = useState<Map<string, StockPrice>>(new Map());
     const [refreshing, setRefreshing] = useState(false);

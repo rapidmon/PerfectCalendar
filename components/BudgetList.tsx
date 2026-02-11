@@ -5,15 +5,18 @@ import AddBudgetModal from './AddBudgetModal';
 import BudgetActionModal from './BudgetActionModal';
 import { Budget, BudgetType } from '../types/budget';
 import { formatDateKorean } from '../utils/format';
-import { useAppData } from '../contexts/AppDataContext';
+import { useStore, useBudgets, useAccounts, useGroup } from '../contexts/AppDataContext';
 
 interface BudgetListProps {
     selectedDate: Date;
 }
 
 export default function BudgetList({ selectedDate }: BudgetListProps) {
-    const { budgets, categories, accounts, isGroupConnected, memberNames, memberColors, store } = useAppData();
-    const memberUids = Object.keys(memberNames);
+    const { store } = useStore();
+    const { budgets, categories } = useBudgets();
+    const { accounts } = useAccounts();
+    const { isGroupConnected, memberNames, memberColors } = useGroup();
+    const memberUids = useMemo(() => Object.keys(memberNames), [memberNames]);
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);

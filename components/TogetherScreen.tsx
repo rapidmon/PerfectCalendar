@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -29,13 +29,17 @@ import {
   saveMemberColor,
   Group
 } from '../firebase';
-import { useAppData } from '../contexts/AppDataContext';
+import { useStore, useTodos, useBudgets, useAccounts, useGroup } from '../contexts/AppDataContext';
 import { getMemberColor, MEMBER_COLORS } from '../utils/memberColors';
 
 type ScreenMode = 'loading' | 'not_connected' | 'connected';
 
 export default function TogetherScreen() {
-  const { store, budgets, todos, accounts, accountBalances, categories, fixedCategories, memberColors } = useAppData();
+  const { store } = useStore();
+  const { todos } = useTodos();
+  const { budgets, categories, fixedCategories } = useBudgets();
+  const { accounts, accountBalances } = useAccounts();
+  const { memberColors } = useGroup();
   const [mode, setMode] = useState<ScreenMode>('loading');
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [showCreateInput, setShowCreateInput] = useState(false);
@@ -46,15 +50,15 @@ export default function TogetherScreen() {
   const [groupInfo, setGroupInfo] = useState<Group | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadExisting, setUploadExisting] = useState(true);
-  const [groupUnsubscribe, setGroupUnsubscribe] = useState<(() => void) | null>(null);
+  const groupUnsubscribeRef = useRef<(() => void) | null>(null);
   const [colorPickerUid, setColorPickerUid] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnectionStatus();
     return () => {
-      groupUnsubscribe?.();
+      groupUnsubscribeRef.current?.();
     };
-  }, [groupUnsubscribe]);
+  }, []);
 
   const checkConnectionStatus = async () => {
     try {
@@ -73,7 +77,7 @@ export default function TogetherScreen() {
             (info) => setGroupInfo(info),
             (error) => console.error('Group subscribe error:', error)
           );
-          setGroupUnsubscribe(() => unsub);
+          groupUnsubscribeRef.current = unsub ?? null;
         }
         setMode('connected');
       } else {
@@ -101,7 +105,7 @@ export default function TogetherScreen() {
         (info) => setGroupInfo(info),
         (error) => console.error('Group subscribe error:', error)
       );
-      setGroupUnsubscribe(() => unsub);
+      groupUnsubscribeRef.current = unsub ?? null;
 
       // Store에서 그룹 동기화 시작
       await store.startGroupSync();
@@ -189,7 +193,7 @@ export default function TogetherScreen() {
           (info) => setGroupInfo(info),
           (error) => console.error('Group subscribe error:', error)
         );
-        setGroupUnsubscribe(() => unsub);
+        groupUnsubscribeRef.current = unsub ?? null;
 
         // 참여 시 로컬 카테고리를 원격과 병합 후 업로드
         if (categories.length > 0) {
@@ -232,8 +236,8 @@ export default function TogetherScreen() {
           text: '나가기',
           style: 'destructive',
           onPress: async () => {
-            groupUnsubscribe?.();
-            setGroupUnsubscribe(null);
+            groupUnsubscribeRef.current?.();
+            groupUnsubscribeRef.current = null;
             // disconnectGroup 먼저 (구독 해제 + 내 데이터 보존)
             // leaveGroup은 그 후 (Firebase에서 멤버 제거)
             await store.disconnectGroup();
@@ -265,9 +269,25 @@ export default function TogetherScreen() {
     );
   }
 
+  // 색상 선택 UI 최적화: 다른 멤버가 사용 중인 색상 set을 미리 계산
+  const currentUid = getCurrentUid();
+  const usedColorsByUid = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    if (!groupInfo?.members) return map;
+    for (const uid of groupInfo.members) {
+      const othersColors = new Set<string>();
+      for (const otherUid of groupInfo.members) {
+        if (otherUid !== uid && memberColors[otherUid]) {
+          othersColors.add(memberColors[otherUid]);
+        }
+      }
+      map.set(uid, othersColors);
+    }
+    return map;
+  }, [groupInfo?.members, memberColors]);
+
   if (mode === 'connected') {
     const memberCount = groupInfo?.members.length || 0;
-    const memberNames = groupInfo?.memberNames ? Object.values(groupInfo.memberNames) : [];
     const displayGroupName = groupInfo?.name;
 
     return (
@@ -293,7 +313,6 @@ export default function TogetherScreen() {
               {groupInfo?.members.map((uid) => {
                 const name = groupInfo.memberNames?.[uid] || '알 수 없음';
                 const color = getMemberColor(uid, groupInfo.members, memberColors);
-                const currentUid = getCurrentUid();
                 const isMe = uid === currentUid;
                 return (
                   <View key={uid}>
@@ -308,9 +327,7 @@ export default function TogetherScreen() {
                     {colorPickerUid === uid && (
                       <View style={styles.colorPickerRow}>
                         {MEMBER_COLORS.map((c) => {
-                          const usedByOther = groupInfo.members.some(
-                            (otherUid) => otherUid !== uid && memberColors[otherUid] === c
-                          );
+                          const usedByOther = usedColorsByUid.get(uid)?.has(c) ?? false;
                           const isSelected = memberColors[uid] === c;
                           return (
                             <TouchableOpacity
