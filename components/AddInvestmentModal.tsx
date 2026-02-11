@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Modal,
     View,
@@ -7,9 +7,12 @@ import {
     TouchableOpacity,
     StyleSheet,
     ScrollView,
+    KeyboardAvoidingView,
+    Platform,
+    ActivityIndicator,
 } from 'react-native';
 import { Investment, StockSearchResult } from '../types/investment';
-import StockSearchModal from './StockSearchModal';
+import { searchStocks } from '../services/stockService';
 
 interface AddInvestmentModalProps {
     visible: boolean;
@@ -25,9 +28,12 @@ export default function AddInvestmentModal({
     onSave,
 }: AddInvestmentModalProps) {
     const [selectedStock, setSelectedStock] = useState<StockSearchResult | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<StockSearchResult[]>([]);
+    const [searching, setSearching] = useState(false);
     const [quantity, setQuantity] = useState('');
     const [averagePrice, setAveragePrice] = useState('');
-    const [showSearchModal, setShowSearchModal] = useState(false);
+    const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         if (editingInvestment) {
@@ -37,6 +43,7 @@ export default function AddInvestmentModal({
                 market: editingInvestment.market,
                 type: editingInvestment.type,
             });
+            setSearchQuery(editingInvestment.name);
             setQuantity(String(editingInvestment.quantity));
             setAveragePrice(String(editingInvestment.averagePrice));
         } else {
@@ -46,8 +53,44 @@ export default function AddInvestmentModal({
 
     const resetForm = () => {
         setSelectedStock(null);
+        setSearchQuery('');
+        setSearchResults([]);
         setQuantity('');
         setAveragePrice('');
+    };
+
+    const handleSearchChange = useCallback((text: string) => {
+        setSearchQuery(text);
+
+        // 종목 선택 상태에서 텍스트 변경하면 선택 해제
+        if (selectedStock && text !== selectedStock.name) {
+            setSelectedStock(null);
+        }
+
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+
+        if (!text.trim()) {
+            setSearchResults([]);
+            return;
+        }
+
+        searchTimer.current = setTimeout(async () => {
+            setSearching(true);
+            try {
+                const results = await searchStocks(text);
+                setSearchResults(results);
+            } catch {
+                setSearchResults([]);
+            } finally {
+                setSearching(false);
+            }
+        }, 400);
+    }, [selectedStock]);
+
+    const handleStockSelect = (stock: StockSearchResult) => {
+        setSelectedStock(stock);
+        setSearchQuery(stock.name);
+        setSearchResults([]);
     };
 
     const handleSave = () => {
@@ -75,13 +118,9 @@ export default function AddInvestmentModal({
     };
 
     const handleClose = () => {
+        if (searchTimer.current) clearTimeout(searchTimer.current);
         resetForm();
         onClose();
-    };
-
-    const handleStockSelect = (stock: StockSearchResult) => {
-        setSelectedStock(stock);
-        setShowSearchModal(false);
     };
 
     const handleNumberInput = (text: string, setter: (value: string) => void) => {
@@ -89,7 +128,6 @@ export default function AddInvestmentModal({
     };
 
     const handlePriceInput = (text: string) => {
-        // 소수점 허용 (미국 주식)
         const cleaned = text.replace(/[^0-9.]/g, '');
         const parts = cleaned.split('.');
         if (parts.length > 2) return;
@@ -106,103 +144,127 @@ export default function AddInvestmentModal({
 
     const isKorea = selectedStock?.type === 'KOREA_STOCK';
     const currencySymbol = isKorea ? '₩' : '$';
+    const showResults = searchResults.length > 0 && !selectedStock;
 
     return (
-        <>
-            <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-                <View style={styles.overlay}>
-                    <View style={styles.modalContainer}>
-                        <Text style={styles.modalTitle}>
-                            {editingInvestment ? '투자 수정' : '투자 추가'}
-                        </Text>
+        <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+            <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                <View style={styles.modalContainer}>
+                    <Text style={styles.modalTitle}>
+                        {editingInvestment ? '투자 수정' : '투자 추가'}
+                    </Text>
 
-                        <ScrollView showsVerticalScrollIndicator={false}>
-                            {/* 종목 선택 */}
-                            <Text style={styles.label}>종목</Text>
-                            <TouchableOpacity
-                                style={styles.stockSelectButton}
-                                onPress={() => setShowSearchModal(true)}
-                            >
-                                {selectedStock ? (
-                                    <View style={styles.selectedStock}>
-                                        <Text style={styles.selectedStockFlag}>
-                                            {isKorea ? '🇰🇷' : '🇺🇸'}
-                                        </Text>
-                                        <View style={styles.selectedStockInfo}>
-                                            <Text style={styles.selectedStockName}>
-                                                {selectedStock.name}
-                                            </Text>
-                                            <Text style={styles.selectedStockTicker}>
-                                                {selectedStock.ticker} • {selectedStock.market}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                ) : (
-                                    <Text style={styles.stockSelectPlaceholder}>
-                                        종목을 선택하세요
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-
-                            {/* 수량 */}
-                            <Text style={styles.label}>보유 수량 (주)</Text>
+                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                        {/* 종목 검색 */}
+                        <Text style={styles.label}>종목 (🇰🇷 한국 / 🇺🇸 미국)</Text>
+                        <View>
                             <TextInput
-                                style={styles.input}
-                                placeholder="보유 수량 입력"
-                                value={quantity}
-                                onChangeText={(text) => handleNumberInput(text, setQuantity)}
-                                keyboardType="numeric"
+                                style={[
+                                    styles.input,
+                                    selectedStock && styles.inputSelected,
+                                ]}
+                                placeholder="종목명 또는 코드 입력"
+                                value={searchQuery}
+                                onChangeText={handleSearchChange}
+                                autoFocus={!editingInvestment}
                             />
-
-                            {/* 평균 매입가 */}
-                            <Text style={styles.label}>평균 매입가 ({currencySymbol})</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="평균 매입가 입력"
-                                value={averagePrice}
-                                onChangeText={handlePriceInput}
-                                keyboardType="decimal-pad"
-                            />
-
-                            {/* 매입금액 미리보기 */}
-                            {isValid() && (
-                                <View style={styles.previewContainer}>
-                                    <Text style={styles.previewLabel}>총 매입금액</Text>
-                                    <Text style={styles.previewValue}>
-                                        {currencySymbol}
-                                        {(parseInt(quantity) * parseFloat(averagePrice)).toLocaleString(
-                                            undefined,
-                                            { minimumFractionDigits: isKorea ? 0 : 2, maximumFractionDigits: isKorea ? 0 : 2 }
-                                        )}
+                            {selectedStock && (
+                                <View style={styles.selectedBadge}>
+                                    <Text style={styles.selectedBadgeFlag}>
+                                        {isKorea ? '🇰🇷' : '🇺🇸'}
                                     </Text>
+                                    <Text style={styles.selectedBadgeText}>
+                                        {selectedStock.ticker} • {selectedStock.market}
+                                    </Text>
+                                    <TouchableOpacity onPress={() => { setSelectedStock(null); setSearchQuery(''); }}>
+                                        <Text style={styles.selectedBadgeClear}>✕</Text>
+                                    </TouchableOpacity>
                                 </View>
                             )}
-                        </ScrollView>
-
-                        <View style={styles.buttonContainer}>
-                            <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
-                                <Text style={styles.cancelButtonText}>취소</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={[styles.saveButton, !isValid() && styles.saveButtonDisabled]}
-                                onPress={handleSave}
-                                disabled={!isValid()}
-                            >
-                                <Text style={styles.saveButtonText}>
-                                    {editingInvestment ? '수정' : '추가'}
-                                </Text>
-                            </TouchableOpacity>
                         </View>
+
+                        {/* 검색 중 표시 */}
+                        {searching && (
+                            <View style={styles.searchingRow}>
+                                <ActivityIndicator size="small" color="#4A90E2" />
+                                <Text style={styles.searchingText}>검색 중...</Text>
+                            </View>
+                        )}
+
+                        {/* 검색 결과 드롭다운 */}
+                        {showResults && (
+                            <View style={styles.resultsList}>
+                                {searchResults.map((item) => {
+                                    const flag = item.type === 'KOREA_STOCK' ? '🇰🇷' : '🇺🇸';
+                                    return (
+                                        <TouchableOpacity
+                                            key={`${item.type}-${item.ticker}`}
+                                            style={styles.resultItem}
+                                            onPress={() => handleStockSelect(item)}
+                                        >
+                                            <Text style={styles.resultFlag}>{flag}</Text>
+                                            <View style={styles.resultInfo}>
+                                                <Text style={styles.resultName} numberOfLines={1}>{item.name}</Text>
+                                                <Text style={styles.resultTicker}>{item.ticker} • {item.market}</Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
+
+                        {/* 수량 */}
+                        <Text style={styles.label}>보유 수량 (주)</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="보유 수량 입력"
+                            value={quantity}
+                            onChangeText={(text) => handleNumberInput(text, setQuantity)}
+                            keyboardType="numeric"
+                        />
+
+                        {/* 평균 매입가 */}
+                        <Text style={styles.label}>평균 매입가 ({currencySymbol})</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="평균 매입가 입력"
+                            value={averagePrice}
+                            onChangeText={handlePriceInput}
+                            keyboardType="decimal-pad"
+                        />
+
+                        {/* 매입금액 미리보기 */}
+                        {isValid() && (
+                            <View style={styles.previewContainer}>
+                                <Text style={styles.previewLabel}>총 매입금액</Text>
+                                <Text style={styles.previewValue}>
+                                    {currencySymbol}
+                                    {(parseInt(quantity) * parseFloat(averagePrice)).toLocaleString(
+                                        undefined,
+                                        { minimumFractionDigits: isKorea ? 0 : 2, maximumFractionDigits: isKorea ? 0 : 2 }
+                                    )}
+                                </Text>
+                            </View>
+                        )}
+                    </ScrollView>
+
+                    <View style={styles.buttonContainer}>
+                        <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
+                            <Text style={styles.cancelButtonText}>취소</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.saveButton, !isValid() && styles.saveButtonDisabled]}
+                            onPress={handleSave}
+                            disabled={!isValid()}
+                        >
+                            <Text style={styles.saveButtonText}>
+                                {editingInvestment ? '수정' : '추가'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
-            </Modal>
-
-            <StockSearchModal
-                visible={showSearchModal}
-                onClose={() => setShowSearchModal(false)}
-                onSelect={handleStockSelect}
-            />
-        </>
+            </KeyboardAvoidingView>
+        </Modal>
     );
 }
 
@@ -241,39 +303,77 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         padding: 12,
         fontSize: 16,
-        marginBottom: 8,
+        marginBottom: 4,
     },
-    stockSelectButton: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 8,
-        padding: 12,
-        marginBottom: 8,
+    inputSelected: {
+        borderColor: '#4A90E2',
+        backgroundColor: '#F8FBFF',
     },
-    stockSelectPlaceholder: {
-        fontSize: 16,
-        color: '#999',
-    },
-    selectedStock: {
+    selectedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#E3F2FD',
+        borderRadius: 6,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        marginBottom: 4,
     },
-    selectedStockFlag: {
-        fontSize: 24,
-        marginRight: 10,
+    selectedBadgeFlag: {
+        fontSize: 14,
+        marginRight: 6,
     },
-    selectedStockInfo: {
+    selectedBadgeText: {
+        fontSize: 13,
+        color: '#4A90E2',
+        fontWeight: '600',
         flex: 1,
     },
-    selectedStockName: {
-        fontSize: 15,
+    selectedBadgeClear: {
+        fontSize: 16,
+        color: '#999',
+        paddingLeft: 8,
+    },
+    searchingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        gap: 8,
+    },
+    searchingText: {
+        fontSize: 13,
+        color: '#999',
+    },
+    resultsList: {
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        marginBottom: 8,
+        maxHeight: 200,
+        overflow: 'hidden',
+    },
+    resultItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    resultFlag: {
+        fontSize: 20,
+        marginRight: 10,
+    },
+    resultInfo: {
+        flex: 1,
+    },
+    resultName: {
+        fontSize: 14,
         fontWeight: '600',
         color: '#333',
+        marginBottom: 2,
     },
-    selectedStockTicker: {
-        fontSize: 13,
+    resultTicker: {
+        fontSize: 12,
         color: '#888',
-        marginTop: 2,
     },
     previewContainer: {
         backgroundColor: '#F5F5F5',
