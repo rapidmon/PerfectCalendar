@@ -7,9 +7,10 @@ interface SetGoalModalProps {
     monthLabel: string;
     onClose: () => void;
     onSave: (amount: number) => void;
+    onDelete?: () => void;
 }
 
-export default function SetGoalModal({ visible, currentGoal, monthLabel, onClose, onSave }: SetGoalModalProps) {
+export default function SetGoalModal({ visible, currentGoal, monthLabel, onClose, onSave, onDelete }: SetGoalModalProps) {
     const [amountText, setAmountText] = useState('');
 
     useEffect(() => {
@@ -45,6 +46,15 @@ export default function SetGoalModal({ visible, currentGoal, monthLabel, onClose
                         keyboardType="numeric"
                         autoFocus
                     />
+
+                    {currentGoal && onDelete && (
+                        <TouchableOpacity
+                            style={styles.deleteButton}
+                            onPress={() => { onDelete(); onClose(); }}
+                        >
+                            <Text style={styles.deleteButtonText}>목표 삭제</Text>
+                        </TouchableOpacity>
+                    )}
 
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -123,5 +133,14 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#fff',
         fontWeight: 'bold',
+    },
+    deleteButton: {
+        alignItems: 'center',
+        paddingVertical: 10,
+        marginBottom: 12,
+    },
+    deleteButtonText: {
+        fontSize: 14,
+        color: '#F44336',
     },
 });
