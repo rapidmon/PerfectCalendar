@@ -22,6 +22,8 @@ import {
   uploadLocalBudgets,
   uploadLocalTodos,
   uploadLocalAccounts,
+  uploadLocalCategories,
+  subscribeToGroupAsync,
   Group
 } from '../firebase';
 import { useAppData } from '../contexts/AppDataContext';
@@ -49,7 +51,7 @@ const getOwnerColorIndex = (uid: string): number => {
 };
 
 export default function TogetherScreen() {
-  const { store, budgets, todos, accounts, accountBalances } = useAppData();
+  const { store, budgets, todos, accounts, accountBalances, categories, fixedCategories } = useAppData();
   const [mode, setMode] = useState<ScreenMode>('loading');
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [showCreateInput, setShowCreateInput] = useState(false);
@@ -60,10 +62,14 @@ export default function TogetherScreen() {
   const [groupInfo, setGroupInfo] = useState<Group | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadExisting, setUploadExisting] = useState(true);
+  const [groupUnsubscribe, setGroupUnsubscribe] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     checkConnectionStatus();
-  }, []);
+    return () => {
+      groupUnsubscribe?.();
+    };
+  }, [groupUnsubscribe]);
 
   const checkConnectionStatus = async () => {
     try {
@@ -76,8 +82,13 @@ export default function TogetherScreen() {
         if (code) {
           setGroupCode(code);
           setUserName(name || '');
-          const info = await getGroupInfo(code);
-          setGroupInfo(info);
+
+          // 실시간 구독으로 멤버 목록 갱신
+          const unsub = await subscribeToGroupAsync(
+            (info) => setGroupInfo(info),
+            (error) => console.error('Group subscribe error:', error)
+          );
+          setGroupUnsubscribe(() => unsub);
         }
         setMode('connected');
       } else {
@@ -99,8 +110,13 @@ export default function TogetherScreen() {
     try {
       const code = await createGroup(userName.trim(), groupName.trim() || undefined);
       setGroupCode(code);
-      const info = await getGroupInfo(code);
-      setGroupInfo(info);
+
+      // 실시간 구독으로 멤버 목록 갱신
+      const unsub = await subscribeToGroupAsync(
+        (info) => setGroupInfo(info),
+        (error) => console.error('Group subscribe error:', error)
+      );
+      setGroupUnsubscribe(() => unsub);
 
       // Store에서 그룹 동기화 시작
       await store.startGroupSync();
@@ -144,6 +160,10 @@ export default function TogetherScreen() {
           uploadMessage += `통장 ${accounts.length}개`;
         }
 
+        if (categories.length > 0) {
+          await uploadLocalCategories(categories, fixedCategories);
+        }
+
         if (uploadMessage) {
           uploadMessage = `\n\n기존 데이터 업로드 완료: ${uploadMessage}`;
         }
@@ -178,8 +198,13 @@ export default function TogetherScreen() {
       const success = await joinGroup(inputCode.trim(), userName.trim());
       if (success) {
         setGroupCode(inputCode.trim().toUpperCase());
-        const info = await getGroupInfo(inputCode.trim().toUpperCase());
-        setGroupInfo(info);
+
+        // 실시간 구독으로 멤버 목록 갱신
+        const unsub = await subscribeToGroupAsync(
+          (info) => setGroupInfo(info),
+          (error) => console.error('Group subscribe error:', error)
+        );
+        setGroupUnsubscribe(() => unsub);
 
         // Store에서 그룹 동기화 시작
         await store.startGroupSync();
@@ -208,6 +233,8 @@ export default function TogetherScreen() {
           text: '나가기',
           style: 'destructive',
           onPress: async () => {
+            groupUnsubscribe?.();
+            setGroupUnsubscribe(null);
             await leaveGroup();
             await store.disconnectGroup();
             setGroupCode('');

@@ -14,7 +14,8 @@ export {
   getCurrentUserName,
   getGroupInfo,
   leaveGroup,
-  isGroupConnected
+  isGroupConnected,
+  subscribeToGroupAsync
 } from './groupService';
 
 // 가계부 서비스
@@ -51,3 +52,12 @@ export {
   addSharedAccount
 } from './accountService';
 export type { SharedAccounts, AccountOwnership } from './accountService';
+
+// 카테고리 서비스
+export {
+  saveSharedCategories,
+  getSharedCategories,
+  subscribeToSharedCategoriesAsync,
+  uploadLocalCategories
+} from './categoryService';
+export type { SharedCategories } from './categoryService';

@@ -4,7 +4,9 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { db, auth } from './config';
@@ -126,4 +128,26 @@ export async function leaveGroup(): Promise<void> {
 export async function isGroupConnected(): Promise<boolean> {
   const code = await getCurrentGroupCode();
   return code !== null;
+}
+
+// 그룹 실시간 구독
+export async function subscribeToGroupAsync(
+  onUpdate: (group: Group) => void,
+  onError?: (error: Error) => void
+): Promise<Unsubscribe | null> {
+  const groupCode = await getCurrentGroupCode();
+  if (!groupCode) return null;
+
+  const docRef = doc(db, 'groups', groupCode);
+  return onSnapshot(
+    docRef,
+    (snapshot) => {
+      if (snapshot.exists()) {
+        onUpdate({ code: groupCode, ...snapshot.data() } as Group);
+      }
+    },
+    (error) => {
+      if (onError) onError(error);
+    }
+  );
 }
