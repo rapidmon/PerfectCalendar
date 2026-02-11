@@ -8,6 +8,8 @@ import {
     FlatList,
     StyleSheet,
     ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { StockSearchResult } from '../types/investment';
 import { searchStocks } from '../services/stockService';
@@ -81,7 +83,10 @@ export default function StockSearchModal({
 
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={handleClose}>
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView
+                style={styles.overlay}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            >
                 <View style={styles.container}>
                     <View style={styles.header}>
                         <Text style={styles.title}>종목 검색</Text>
@@ -152,7 +157,7 @@ export default function StockSearchModal({
                         />
                     )}
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }
