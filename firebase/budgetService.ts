@@ -121,20 +121,21 @@ export async function subscribeToSharedBudgetsAsync(
 
 // 로컬 Budget을 SharedBudget 형식으로 변환
 export function convertToSharedBudget(
-  localBudget: { money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account?: string }
+  localBudget: { money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account?: string; title?: string }
 ): Omit<SharedBudget, 'id' | 'author' | 'authorName' | 'createdAt' | 'updatedAt'> {
   return {
     money: localBudget.type === 'EXPENSE' ? -Math.abs(localBudget.money) : Math.abs(localBudget.money),
     date: localBudget.date,
     account: localBudget.account || '',
-    category: localBudget.category
+    category: localBudget.category,
+    memo: localBudget.title || '',
   };
 }
 
 // SharedBudget을 로컬 Budget 형식으로 변환
 export function convertToLocalBudget(
   sharedBudget: SharedBudget
-): { id: string; money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account: string; title: string } {
+): { id: string; money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account: string; title: string; authorUid: string; authorName: string } {
   return {
     id: sharedBudget.id,
     money: Math.abs(sharedBudget.money),
@@ -142,13 +143,15 @@ export function convertToLocalBudget(
     type: sharedBudget.money >= 0 ? 'INCOME' : 'EXPENSE',
     category: sharedBudget.category,
     account: sharedBudget.account,
-    title: `${sharedBudget.authorName}` // 작성자 이름을 title로 사용
+    title: sharedBudget.memo || '',
+    authorUid: sharedBudget.author,
+    authorName: sharedBudget.authorName,
   };
 }
 
 // 기존 로컬 가계부 데이터 일괄 업로드
 export async function uploadLocalBudgets(
-  budgets: Array<{ money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account?: string }>
+  budgets: Array<{ money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account?: string; title?: string }>
 ): Promise<number> {
   let uploadedCount = 0;
 

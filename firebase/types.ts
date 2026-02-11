@@ -6,6 +6,7 @@ export interface SharedBudget {
   date: string;           // "YYYY-MM-DD"
   account: string;        // 통장명
   category: string;       // 카테고리
+  memo: string;           // 메모 (제목)
   author: string;         // 작성자 uid
   authorName: string;     // 작성자 표시 이름
   createdAt: number;      // timestamp
