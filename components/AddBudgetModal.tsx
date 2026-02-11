@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { Budget, BudgetType } from '../types/budget';
 
 interface AddBudgetModalProps {
@@ -115,7 +115,7 @@ export default function AddBudgetModal({ visible, selectedDate, editingBudget, c
         animationType="fade"
         onRequestClose={onClose}
         >
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>
                 {editingBudget ? '가계부 수정' : '가계부 추가'}
@@ -269,7 +269,7 @@ export default function AddBudgetModal({ visible, selectedDate, editingBudget, c
                 </TouchableOpacity>
             </View>
             </View>
-        </View>
+        </KeyboardAvoidingView>
         </Modal>
     );
 }

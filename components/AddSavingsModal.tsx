@@ -8,6 +8,7 @@ import {
     StyleSheet,
     ScrollView,
     Platform,
+    KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Savings, SavingsType } from '../types/savings';
@@ -182,7 +183,7 @@ export default function AddSavingsModal({
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <View style={styles.modalContainer}>
                     <Text style={styles.modalTitle}>
                         {editingSavings ? '적금/예금 수정' : '적금/예금 추가'}
@@ -375,7 +376,7 @@ export default function AddSavingsModal({
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

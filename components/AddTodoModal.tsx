@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Todo, TodoType } from '../types/todo';
 
 interface AddTodoModalProps {
@@ -151,7 +151,7 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
         animationType="fade"
         onRequestClose={onClose}
         >
-        <View style={styles.overlay}>
+        <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>
                 {editingTodo ? '할 일 수정' : '할 일 추가'}
@@ -343,7 +343,7 @@ export default function AddTodoModal({ visible, selectedDate, editingTodo, onClo
                 </TouchableOpacity>
             </View>
             </View>
-        </View>
+        </KeyboardAvoidingView>
         </Modal>
     );
 }

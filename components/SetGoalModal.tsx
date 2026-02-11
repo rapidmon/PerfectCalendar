@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 
 interface SetGoalModalProps {
     visible: boolean;
@@ -34,7 +34,7 @@ export default function SetGoalModal({ visible, currentGoal, monthLabel, onClose
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <View style={styles.modalContainer}>
                     <Text style={styles.modalTitle}>{monthLabel} 지출 목표</Text>
 
@@ -69,7 +69,7 @@ export default function SetGoalModal({ visible, currentGoal, monthLabel, onClose
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }
