@@ -8,6 +8,7 @@ import AccountManageModal from './AccountManageModal';
 import OverallStatsModal from './OverallStatsModal';
 import BudgetTutorial, { TutorialStep } from './BudgetTutorial';
 import { AccountBalances } from '../types/budget';
+import { AccountOwnership } from '../firebase';
 import { useAppData } from '../contexts/AppDataContext';
 import { computeMonthlyStats, getMultiMonthChartData, computeAccountBalances } from '../utils/budgetAnalytics';
 import { loadBudgetTutorialComplete, saveBudgetTutorialComplete } from '../utils/storage';
@@ -17,7 +18,7 @@ interface BudgetFullListProps {
 }
 
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
-    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, accountOwners, isGroupConnected, store } = useAppData();
+    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, accountOwners, memberNames, isGroupConnected, store } = useAppData();
 
     const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(selectedDate.getMonth() + 1);
@@ -88,12 +89,16 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         store.setMonthlyGoal(monthKey, amount);
     }, [store, monthKey]);
 
+    const handleDeleteGoal = useCallback(() => {
+        store.deleteMonthlyGoal(monthKey);
+    }, [store, monthKey]);
+
     const handleSaveCategories = useCallback((cats: string[], fixed: string[]) => {
         store.saveCategoriesAndFixed(cats, fixed);
     }, [store]);
 
-    const handleSaveAccounts = useCallback((accs: string[], balances: AccountBalances) => {
-        store.saveAccountsAndBalances(accs, balances);
+    const handleSaveAccounts = useCallback((accs: string[], balances: AccountBalances, owners?: AccountOwnership) => {
+        store.saveAccountsAndBalances(accs, balances, owners);
     }, [store]);
 
     const openSettingsItem = useCallback((target: 'goal' | 'category' | 'accountManage') => {
@@ -158,6 +163,7 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                     fixedCategories={fixedCategories}
                     goalAmount={monthlyGoals[monthKey]}
                     accountBalances={accountBalanceList}
+                    isGroupConnected={isGroupConnected}
                 />
 
                 <MonthlyChartCard chartData={chartData} />
@@ -169,6 +175,7 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 monthLabel={monthLabel}
                 onClose={() => setGoalModalVisible(false)}
                 onSave={handleSaveGoal}
+                onDelete={handleDeleteGoal}
             />
 
             <CategoryManageModal
@@ -183,6 +190,9 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 visible={accountManageModalVisible}
                 accounts={accounts}
                 initialBalances={accountBalances}
+                accountOwners={accountOwners}
+                memberNames={memberNames}
+                isGroupConnected={isGroupConnected}
                 onClose={() => setAccountManageModalVisible(false)}
                 onSave={handleSaveAccounts}
             />

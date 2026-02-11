@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
 import { AccountBalances } from '../types/budget';
+import { AccountOwnership } from '../firebase';
 
 const ACCOUNT_COLORS = [
     '#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C',
     '#1ABC9C', '#F39C12', '#3498DB', '#D35400', '#2ECC71',
 ];
+
+// 멤버별 고유 색상 (UID 기반)
+const MEMBER_COLORS = ['#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C', '#1ABC9C'];
+
+function getMemberColor(uid: string, allUids: string[]): string {
+    const idx = allUids.indexOf(uid);
+    return MEMBER_COLORS[idx >= 0 ? idx % MEMBER_COLORS.length : 0];
+}
 
 interface AccountItem {
     key: string;
@@ -17,22 +25,32 @@ interface AccountManageModalProps {
     visible: boolean;
     accounts: string[];
     initialBalances: AccountBalances;
+    accountOwners?: AccountOwnership;
+    memberNames?: { [uid: string]: string };
+    isGroupConnected?: boolean;
     onClose: () => void;
-    onSave: (accounts: string[], balances: AccountBalances) => void;
+    onSave: (accounts: string[], balances: AccountBalances, owners?: AccountOwnership) => void;
 }
 
 export default function AccountManageModal({
     visible,
     accounts,
     initialBalances,
+    accountOwners = {},
+    memberNames = {},
+    isGroupConnected = false,
     onClose,
     onSave,
 }: AccountManageModalProps) {
     const [list, setList] = useState<AccountItem[]>([]);
     const [balanceTexts, setBalanceTexts] = useState<Record<string, string>>({});
+    const [localOwners, setLocalOwners] = useState<AccountOwnership>({});
     const [newAccount, setNewAccount] = useState('');
     const [editingKey, setEditingKey] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
+    const [ownerPickerAccount, setOwnerPickerAccount] = useState<string | null>(null);
+
+    const memberUids = Object.keys(memberNames);
 
     useEffect(() => {
         if (visible) {
@@ -47,11 +65,13 @@ export default function AccountManageModal({
                 texts[account] = val ? String(val) : '';
             }
             setBalanceTexts(texts);
+            setLocalOwners({ ...accountOwners });
             setNewAccount('');
             setEditingKey(null);
             setEditingName('');
+            setOwnerPickerAccount(null);
         }
-    }, [visible, accounts, initialBalances]);
+    }, [visible, accounts, initialBalances, accountOwners]);
 
     const handleAdd = () => {
         const trimmed = newAccount.trim();
@@ -74,6 +94,29 @@ export default function AccountManageModal({
         setBalanceTexts(prev => {
             const next = { ...prev };
             delete next[name];
+            return next;
+        });
+        setLocalOwners(prev => {
+            const next = { ...prev };
+            delete next[name];
+            return next;
+        });
+    };
+
+    const handleMoveUp = (index: number) => {
+        if (index <= 0) return;
+        setList(prev => {
+            const next = [...prev];
+            [next[index - 1], next[index]] = [next[index], next[index - 1]];
+            return next;
+        });
+    };
+
+    const handleMoveDown = (index: number) => {
+        setList(prev => {
+            if (index >= prev.length - 1) return prev;
+            const next = [...prev];
+            [next[index], next[index + 1]] = [next[index + 1], next[index]];
             return next;
         });
     };
@@ -109,6 +152,15 @@ export default function AccountManageModal({
                 delete next[oldName];
                 return next;
             });
+            // 소유자 정보도 새 이름으로 이전
+            setLocalOwners(prev => {
+                const next = { ...prev };
+                if (next[oldName]) {
+                    next[trimmed] = next[oldName];
+                    delete next[oldName];
+                }
+                return next;
+            });
         }
         setEditingKey(null);
         setEditingName('');
@@ -135,25 +187,47 @@ export default function AccountManageModal({
                 balances[name] = val;
             }
         }
-        onSave(accountNames, balances);
+        onSave(accountNames, balances, isGroupConnected ? localOwners : undefined);
         onClose();
     };
 
-    const renderItem = ({ item, drag, isActive, getIndex }: RenderItemParams<AccountItem>) => {
-        const index = getIndex() ?? 0;
-        const color = ACCOUNT_COLORS[index % ACCOUNT_COLORS.length];
+    const handleOwnerChange = (accountName: string, newOwnerUid: string) => {
+        setLocalOwners(prev => ({ ...prev, [accountName]: newOwnerUid }));
+        setOwnerPickerAccount(null);
+    };
+
+    const renderItem = (item: AccountItem, index: number) => {
         const isEditing = editingKey === item.key;
+        const isFirst = index === 0;
+        const isLast = index === list.length - 1;
+
+        // 그룹 모드에서는 소유자 색상 사용, 아니면 인덱스 기반 색상
+        const ownerUid = localOwners[item.name];
+        const color = isGroupConnected && ownerUid
+            ? getMemberColor(ownerUid, memberUids)
+            : ACCOUNT_COLORS[index % ACCOUNT_COLORS.length];
+        const ownerName = ownerUid ? (memberNames[ownerUid] || '알 수 없음') : '';
+        const isPickerOpen = ownerPickerAccount === item.name;
 
         return (
-            <ScaleDecorator>
-                <View style={[styles.itemRow, isActive && styles.itemRowActive]}>
-                    <TouchableOpacity
-                        onLongPress={drag}
-                        delayLongPress={100}
-                        style={styles.dragHandle}
-                    >
-                        <Text style={styles.dragIcon}>☰</Text>
-                    </TouchableOpacity>
+            <View key={item.key}>
+                <View style={styles.itemRow}>
+                    <View style={styles.reorderButtons}>
+                        <TouchableOpacity
+                            onPress={() => handleMoveUp(index)}
+                            style={[styles.arrowBtn, isFirst && styles.arrowBtnDisabled]}
+                            disabled={isFirst}
+                        >
+                            <Text style={[styles.arrowText, isFirst && styles.arrowTextDisabled]}>▲</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => handleMoveDown(index)}
+                            style={[styles.arrowBtn, isLast && styles.arrowBtnDisabled]}
+                            disabled={isLast}
+                        >
+                            <Text style={[styles.arrowText, isLast && styles.arrowTextDisabled]}>▼</Text>
+                        </TouchableOpacity>
+                    </View>
                     <View style={[styles.numberBadge, { backgroundColor: color }]}>
                         <Text style={styles.numberBadgeText}>{index + 1}</Text>
                     </View>
@@ -179,6 +253,17 @@ export default function AccountManageModal({
                                 <Text style={styles.itemText}>{item.name} ✎</Text>
                             </TouchableOpacity>
                         )}
+                        {/* 그룹 모드: 소유자 표시 및 변경 */}
+                        {isGroupConnected && (
+                            <TouchableOpacity
+                                style={styles.ownerRow}
+                                onPress={() => setOwnerPickerAccount(isPickerOpen ? null : item.name)}
+                            >
+                                <View style={[styles.ownerDot, { backgroundColor: color }]} />
+                                <Text style={styles.ownerText}>{ownerName || '소유자 미지정'}</Text>
+                                <Text style={styles.ownerChangeText}>변경</Text>
+                            </TouchableOpacity>
+                        )}
                         <View style={styles.balanceRow}>
                             <Text style={styles.balanceLabel}>초기 잔액</Text>
                             <TextInput
@@ -195,7 +280,29 @@ export default function AccountManageModal({
                         <Text style={styles.deleteText}>삭제</Text>
                     </TouchableOpacity>
                 </View>
-            </ScaleDecorator>
+                {/* 소유자 선택 피커 */}
+                {isGroupConnected && isPickerOpen && (
+                    <View style={styles.ownerPicker}>
+                        {memberUids.map(uid => {
+                            const memberColor = getMemberColor(uid, memberUids);
+                            const isSelected = localOwners[item.name] === uid;
+                            return (
+                                <TouchableOpacity
+                                    key={uid}
+                                    style={[styles.ownerPickerItem, isSelected && styles.ownerPickerItemSelected]}
+                                    onPress={() => handleOwnerChange(item.name, uid)}
+                                >
+                                    <View style={[styles.ownerDot, { backgroundColor: memberColor }]} />
+                                    <Text style={[styles.ownerPickerText, isSelected && styles.ownerPickerTextSelected]}>
+                                        {memberNames[uid] || uid}
+                                    </Text>
+                                    {isSelected && <Text style={styles.checkMark}>✓</Text>}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+                )}
+            </View>
         );
     };
 
@@ -204,7 +311,7 @@ export default function AccountManageModal({
             <View style={styles.overlay}>
                 <View style={styles.modalContainer}>
                     <Text style={styles.modalTitle}>통장 관리</Text>
-                    <Text style={styles.hintText}>☰ 아이콘을 길게 눌러 순서를 변경하세요</Text>
+                    <Text style={styles.hintText}>▲ ▼ 버튼으로 순서를 변경하세요</Text>
 
                     <View style={styles.addRow}>
                         <TextInput
@@ -219,19 +326,13 @@ export default function AccountManageModal({
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.listContainer}>
+                    <ScrollView style={styles.listContainer}>
                         {list.length === 0 ? (
                             <Text style={styles.emptyText}>통장이 없습니다</Text>
                         ) : (
-                            <DraggableFlatList
-                                data={list}
-                                onDragEnd={({ data }) => setList(data)}
-                                keyExtractor={(item) => item.key}
-                                renderItem={renderItem}
-                                containerStyle={styles.flatListContainer}
-                            />
+                            list.map((item, index) => renderItem(item, index))
                         )}
-                    </View>
+                    </ScrollView>
 
                     <View style={styles.buttonContainer}>
                         <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
@@ -303,33 +404,33 @@ const styles = StyleSheet.create({
         maxHeight: 300,
         marginBottom: 16,
     },
-    flatListContainer: {
-        maxHeight: 300,
-    },
     itemRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
         paddingHorizontal: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#f0f0f0',
         backgroundColor: '#fff',
     },
-    itemRowActive: {
-        backgroundColor: '#f5f5f5',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
-        elevation: 5,
+    reorderButtons: {
+        marginRight: 6,
+        alignItems: 'center',
+        gap: 2,
     },
-    dragHandle: {
-        padding: 8,
-        marginRight: 4,
+    arrowBtn: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
     },
-    dragIcon: {
-        fontSize: 16,
-        color: '#999',
+    arrowBtnDisabled: {
+        opacity: 0.25,
+    },
+    arrowText: {
+        fontSize: 12,
+        color: '#666',
+    },
+    arrowTextDisabled: {
+        color: '#ccc',
     },
     numberBadge: {
         width: 22,
@@ -409,6 +510,57 @@ const styles = StyleSheet.create({
     deleteText: {
         fontSize: 13,
         color: '#F44336',
+    },
+    ownerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 4,
+    },
+    ownerDot: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 6,
+    },
+    ownerText: {
+        fontSize: 12,
+        color: '#666',
+    },
+    ownerChangeText: {
+        fontSize: 11,
+        color: '#4A90E2',
+        marginLeft: 8,
+    },
+    ownerPicker: {
+        backgroundColor: '#f9f9f9',
+        borderRadius: 8,
+        marginHorizontal: 8,
+        marginBottom: 8,
+        padding: 6,
+    },
+    ownerPickerItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 10,
+        borderRadius: 6,
+    },
+    ownerPickerItemSelected: {
+        backgroundColor: '#E3F2FD',
+    },
+    ownerPickerText: {
+        fontSize: 13,
+        color: '#333',
+        flex: 1,
+    },
+    ownerPickerTextSelected: {
+        fontWeight: 'bold',
+        color: '#4A90E2',
+    },
+    checkMark: {
+        fontSize: 14,
+        color: '#4A90E2',
+        fontWeight: 'bold',
     },
     emptyText: {
         textAlign: 'center',
