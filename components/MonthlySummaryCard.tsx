@@ -31,6 +31,7 @@ interface MonthlySummaryCardProps {
     fixedCategories: string[];
     goalAmount: number | undefined;
     accountBalances: { name: string; balance: number; ownerUid?: string }[];
+    isGroupConnected?: boolean;
 }
 
 export default function MonthlySummaryCard({
@@ -41,6 +42,7 @@ export default function MonthlySummaryCard({
     fixedCategories,
     goalAmount,
     accountBalances,
+    isGroupConnected = false,
 }: MonthlySummaryCardProps) {
     const [expenseExpanded, setExpenseExpanded] = useState(false);
 
@@ -79,7 +81,7 @@ export default function MonthlySummaryCard({
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>통장별 잔액</Text>
                     {accountBalances.map(item => {
-                        const ownerColor = item.ownerUid
+                        const ownerColor = isGroupConnected && item.ownerUid
                             ? OWNER_COLORS[getOwnerColorIndex(item.ownerUid)]
                             : undefined;
                         return (
