@@ -21,6 +21,7 @@ export interface AppData {
     monthlyGoals: MonthlyGoal;
     accountBalances: AccountBalances;
     accountOwners: AccountOwnership;
+    memberNames: { [uid: string]: string };
     investments: Investment[];
     savings: Savings[];
     isLoaded: boolean;
@@ -58,6 +59,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         monthlyGoals: store.monthlyGoals,
         accountBalances: store.accountBalances,
         accountOwners: store.accountOwners,
+        memberNames: store.memberNames,
         investments: store.investments,
         savings: store.savings,
         isLoaded: store.isLoaded,

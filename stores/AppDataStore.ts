@@ -34,10 +34,15 @@ import {
     getSharedAccounts,
     fetchMyBudgets,
     fetchMyTodos,
+    subscribeToSharedCategoriesAsync,
+    saveSharedCategories,
+    subscribeToGroupAsync,
     SharedBudget,
     SharedTodo,
     SharedAccounts,
+    SharedCategories,
     AccountOwnership,
+    Group,
 } from '../firebase';
 
 type Listener = () => void;
@@ -82,9 +87,12 @@ export class AppDataStore {
     private _isGroupConnected = false;
     private _groupCode: string | null = null;
     private _userName: string | null = null;
+    private _memberNames: { [uid: string]: string } = {};
     private _budgetUnsubscribe: Unsubscribe | null = null;
     private _todoUnsubscribe: Unsubscribe | null = null;
     private _accountUnsubscribe: Unsubscribe | null = null;
+    private _categoryUnsubscribe: Unsubscribe | null = null;
+    private _groupUnsubscribe: Unsubscribe | null = null;
 
     private _saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private _listeners = new Set<Listener>();
@@ -106,6 +114,7 @@ export class AppDataStore {
     get isGroupConnected(): boolean { return this._isGroupConnected; }
     get groupCode(): string | null { return this._groupCode; }
     get userName(): string | null { return this._userName; }
+    get memberNames(): { [uid: string]: string } { return this._memberNames; }
 
     // ── Observer Pattern ───────────────────────────────────────
     subscribe(listener: Listener): () => void {
@@ -249,9 +258,41 @@ export class AppDataStore {
                     this._accounts = sharedAccounts.accounts || [];
                     this._accountBalances = sharedAccounts.balances || {};
                     this._accountOwners = sharedAccounts.owners || {};
+
+                    // 소유자 없는 통장 보정: 현재 사용자로 할당
+                    const uid = getCurrentUid();
+                    if (uid && this._accounts.length > 0) {
+                        const orphaned = this._accounts.filter(acc => !this._accountOwners[acc]);
+                        if (orphaned.length > 0) {
+                            for (const acc of orphaned) {
+                                this._accountOwners[acc] = uid;
+                            }
+                            saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners).catch(console.error);
+                        }
+                    }
+
                     this.notify();
                 },
                 (error) => console.error('Account sync error:', error)
+            ) || null;
+
+            // 카테고리 실시간 구독
+            this._categoryUnsubscribe = await subscribeToSharedCategoriesAsync(
+                (shared: SharedCategories) => {
+                    this._categories = shared.categories || [];
+                    this._fixedCategories = shared.fixedCategories || [];
+                    this.notify();
+                },
+                (error) => console.error('Category sync error:', error)
+            ) || null;
+
+            // 그룹 멤버 실시간 구독
+            this._groupUnsubscribe = await subscribeToGroupAsync(
+                (group: Group) => {
+                    this._memberNames = group.memberNames || {};
+                    this.notify();
+                },
+                (error) => console.error('Group member sync error:', error)
             ) || null;
 
             this.notify();
@@ -273,16 +314,26 @@ export class AppDataStore {
             this._accountUnsubscribe();
             this._accountUnsubscribe = null;
         }
+        if (this._categoryUnsubscribe) {
+            this._categoryUnsubscribe();
+            this._categoryUnsubscribe = null;
+        }
+        if (this._groupUnsubscribe) {
+            this._groupUnsubscribe();
+            this._groupUnsubscribe = null;
+        }
     }
 
     async disconnectGroup(): Promise<void> {
-        // 나가기 전에 그룹 코드 저장 (내 데이터 조회용)
+        // 나가기 전에 그룹 코드와 UID 저장
         const groupCode = this._groupCode;
+        const uid = getCurrentUid();
 
         this.stopGroupSync();
         this._isGroupConnected = false;
         this._groupCode = null;
         this._userName = null;
+        this._memberNames = {};
 
         // 내가 작성한 데이터만 Firebase에서 가져오기
         if (groupCode) {
@@ -301,21 +352,46 @@ export class AppDataStore {
                 this._budgets = myBudgets;
                 this._todos = myTodos;
 
+                // 내 통장만 유지 (소유자 기준 필터링)
+                if (uid) {
+                    const myAccounts = this._accounts.filter(acc => this._accountOwners[acc] === uid);
+                    const myBalances: AccountBalances = {};
+                    for (const acc of myAccounts) {
+                        if (this._accountBalances[acc] !== undefined) {
+                            myBalances[acc] = this._accountBalances[acc];
+                        }
+                    }
+                    this._accounts = myAccounts;
+                    this._accountBalances = myBalances;
+                } else {
+                    this._accounts = [];
+                    this._accountBalances = {};
+                }
+                this._accountOwners = {};
+
                 // 로컬에도 저장
                 await Promise.all([
                     saveBudgets(myBudgets),
                     saveTodos(myTodos),
+                    saveAccounts(this._accounts),
+                    saveAccountBalances(this._accountBalances),
                 ]);
             } catch (error) {
                 console.error('내 데이터 가져오기 실패:', error);
                 // 실패 시 빈 배열로 초기화
                 this._budgets = [];
                 this._todos = [];
+                this._accounts = [];
+                this._accountBalances = {};
+                this._accountOwners = {};
             }
         } else {
             // 그룹 코드 없으면 빈 배열
             this._budgets = [];
             this._todos = [];
+            this._accounts = [];
+            this._accountBalances = {};
+            this._accountOwners = {};
         }
 
         this.notify();
@@ -325,12 +401,14 @@ export class AppDataStore {
     private sharedBudgetToLocal(sb: SharedBudget): Budget {
         return {
             id: sb.id,
-            title: sb.authorName,
+            title: sb.memo || '',
             money: Math.abs(sb.money),
             date: sb.date,
             type: sb.money >= 0 ? 'INCOME' : 'EXPENSE',
             category: sb.category,
             account: sb.account,
+            authorUid: sb.author,
+            authorName: sb.authorName,
         };
     }
 
@@ -356,21 +434,24 @@ export class AppDataStore {
             date: budget.date,
             account: budget.account || '',
             category: budget.category,
+            memo: budget.title,
         };
     }
 
     private localTodoToShared(todo: Todo): Omit<SharedTodo, 'id' | 'author' | 'authorName' | 'createdAt' | 'updatedAt'> {
-        return {
+        const result: Record<string, any> = {
             title: todo.title,
             type: todo.type,
             completed: todo.completed,
-            recurringDay: todo.recurringDay,
-            monthlyRecurringDay: todo.monthlyRecurringDay,
-            deadline: todo.deadline,
-            specificDate: todo.specificDate,
-            dateRangeStart: todo.dateRangeStart,
-            dateRangeEnd: todo.dateRangeEnd,
         };
+        // Firestore는 undefined 값을 거부하므로 값이 있는 필드만 포함
+        if (todo.recurringDay !== undefined) result.recurringDay = todo.recurringDay;
+        if (todo.monthlyRecurringDay !== undefined) result.monthlyRecurringDay = todo.monthlyRecurringDay;
+        if (todo.deadline !== undefined) result.deadline = todo.deadline;
+        if (todo.specificDate !== undefined) result.specificDate = todo.specificDate;
+        if (todo.dateRangeStart !== undefined) result.dateRangeStart = todo.dateRangeStart;
+        if (todo.dateRangeEnd !== undefined) result.dateRangeEnd = todo.dateRangeEnd;
+        return result as Omit<SharedTodo, 'id' | 'author' | 'authorName' | 'createdAt' | 'updatedAt'>;
     }
 
     // ── Todo CRUD ──────────────────────────────────────────────
@@ -468,6 +549,10 @@ export class AppDataStore {
         this._categories = [...this._categories, category];
         this.notify();
         this.debouncedSave('categories', () => saveCategories(this._categories));
+
+        if (this._isGroupConnected) {
+            saveSharedCategories(this._categories, this._fixedCategories).catch(console.error);
+        }
     }
 
     saveCategoriesAndFixed(cats: string[], fixed: string[]): void {
@@ -476,6 +561,10 @@ export class AppDataStore {
         this.notify();
         this.debouncedSave('categories', () => saveCategories(this._categories));
         this.debouncedSave('fixedCategories', () => saveFixedExpenseCategories(this._fixedCategories));
+
+        if (this._isGroupConnected) {
+            saveSharedCategories(cats, fixed).catch(console.error);
+        }
     }
 
     // ── Account Management ─────────────────────────────────────
@@ -495,15 +584,22 @@ export class AppDataStore {
         this.debouncedSave('accounts', () => saveAccounts(this._accounts));
     }
 
-    saveAccountsAndBalances(accs: string[], balances: AccountBalances): void {
+    saveAccountsAndBalances(accs: string[], balances: AccountBalances, owners?: AccountOwnership): void {
+        const prevAccounts = new Set(this._accounts);
         this._accounts = accs;
         this._accountBalances = balances;
 
-        // 삭제된 통장의 소유자 정보도 제거
+        // 소유자 정보: 명시적으로 전달된 경우 사용, 아니면 자동 할당
         const newOwners: AccountOwnership = {};
+        const uid = this._isGroupConnected ? getCurrentUid() : null;
         for (const acc of accs) {
-            if (this._accountOwners[acc]) {
+            if (owners && owners[acc]) {
+                newOwners[acc] = owners[acc];
+            } else if (this._accountOwners[acc]) {
                 newOwners[acc] = this._accountOwners[acc];
+            } else if (uid && !prevAccounts.has(acc)) {
+                // 새로 추가된 통장: 현재 사용자를 소유자로 설정
+                newOwners[acc] = uid;
             }
         }
         this._accountOwners = newOwners;
@@ -522,6 +618,14 @@ export class AppDataStore {
     // ── Monthly Goals ──────────────────────────────────────────
     setMonthlyGoal(monthKey: string, amount: number): void {
         this._monthlyGoals = { ...this._monthlyGoals, [monthKey]: amount };
+        this.notify();
+        this.debouncedSave('monthlyGoals', () => saveMonthlyGoals(this._monthlyGoals));
+    }
+
+    deleteMonthlyGoal(monthKey: string): void {
+        const next = { ...this._monthlyGoals };
+        delete next[monthKey];
+        this._monthlyGoals = next;
         this.notify();
         this.debouncedSave('monthlyGoals', () => saveMonthlyGoals(this._monthlyGoals));
     }
