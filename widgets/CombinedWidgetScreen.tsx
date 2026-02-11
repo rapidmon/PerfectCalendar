@@ -163,7 +163,7 @@ function TodoContent({ todos }: { todos: Todo[] }) {
                         />
                     </FlexWidget>
                 ) : (
-                    <ListWidget style={{ width: 'match_parent', flex: 1 }}>
+                    <ListWidget style={{ width: 'match_parent', height: 'match_parent' }}>
                         {filtered.map(todo => (
                             <TodoCard key={todo.id} todo={todo} />
                         ))}

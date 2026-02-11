@@ -183,7 +183,7 @@ export default function TodoWidgetScreen({ todos }: TodoWidgetScreenProps) {
                     <ListWidget
                         style={{
                             width: 'match_parent',
-                            flex: 1,
+                            height: 'match_parent',
                         }}
                     >
                         {filteredTodos.map(todo => (
