@@ -6,7 +6,11 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(eas credentials:*)",
-      "Bash(eas build:*)"
+      "Bash(eas build:*)",
+      "Bash(npx expo doctor:*)",
+      "Bash(npx expo-doctor:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -17,20 +17,20 @@ export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps
             return `매달 ${todo.monthlyRecurringDay}일`;
         case 'DEADLINE':
             if (todo.deadline) {
-                const deadlineDate = new Date(todo.deadline);
-                const diffTime = deadlineDate.getTime() - selectedDate.getTime();
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                
+                const deadlineDate = new Date(todo.deadline + 'T00:00:00');
+                const selected = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+                const diffDays = Math.round((deadlineDate.getTime() - selected.getTime()) / (1000 * 60 * 60 * 24));
+
                 if (diffDays === 0) {
-                    return '오늘까지!';
-                } else {
+                    return 'D-DAY';
+                } else if (diffDays > 0) {
                     return `D-${diffDays}`;
                 }
             }
             return '';
         
         case 'SPECIFIC':
-            return `오늘이다!`;
+            return '';
 
         case 'DATE_RANGE':
             if (todo.dateRangeStart && todo.dateRangeEnd) {
@@ -47,9 +47,9 @@ export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps
 
     const getDateColor = () => {
         if (todo.type === 'DEADLINE' && todo.deadline) {
-            const deadlineDate = new Date(todo.deadline);
-            const diffTime = deadlineDate.getTime() - selectedDate.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const deadlineDate = new Date(todo.deadline + 'T00:00:00');
+            const selected = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+            const diffDays = Math.round((deadlineDate.getTime() - selected.getTime()) / (1000 * 60 * 60 * 24));
             if (diffDays <= 3) return '#FF9800';
             return '#4A90E2';
         }

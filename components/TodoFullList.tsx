@@ -332,8 +332,8 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     cardOverdue: {
-        backgroundColor: '#FFF9C4',
-        borderColor: '#FFF176',
+        backgroundColor: '#FFEBEE',
+        borderColor: '#EF9A9A',
     },
     cardCompleted: {
         backgroundColor: '#E8F5E9',

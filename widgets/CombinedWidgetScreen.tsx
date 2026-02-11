@@ -122,8 +122,17 @@ function TodoCard({ todo }: { todo: Todo }) {
 }
 
 function TodoContent({ todos }: { todos: Todo[] }) {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     const filtered = todos
-        .filter(t => !t.completed && (t.type === 'DEADLINE' || t.type === 'SPECIFIC' || t.type === 'DATE_RANGE'))
+        .filter(t => {
+            if (t.completed) return false;
+            if (t.type === 'SPECIFIC') return !!t.specificDate && t.specificDate >= todayStr;
+            if (t.type === 'DEADLINE') return !!t.deadline && t.deadline >= todayStr;
+            if (t.type === 'DATE_RANGE') return !!t.dateRangeEnd && t.dateRangeEnd >= todayStr;
+            return false;
+        })
         .sort((a, b) => {
             const dateA = a.deadline || a.specificDate || a.dateRangeStart || '';
             const dateB = b.deadline || b.specificDate || b.dateRangeStart || '';

@@ -410,8 +410,21 @@ struct TodoTabContent: View {
     let maxItems: Int
 
     var activeTodos: [TodoItem] {
-        todos
-            .filter { !$0.completed && ($0.type == "DEADLINE" || $0.type == "SPECIFIC" || $0.type == "DATE_RANGE") }
+        let today = todayString()
+        return todos
+            .filter { todo in
+                guard !todo.completed else { return false }
+                switch todo.type {
+                case "SPECIFIC":
+                    return (todo.specificDate ?? "") >= today
+                case "DEADLINE":
+                    return (todo.deadline ?? "") >= today
+                case "DATE_RANGE":
+                    return (todo.dateRangeEnd ?? "") >= today
+                default:
+                    return false
+                }
+            }
             .sorted {
                 let a = $0.deadline ?? $0.specificDate ?? $0.dateRangeStart ?? ""
                 let b = $1.deadline ?? $1.specificDate ?? $1.dateRangeStart ?? ""
