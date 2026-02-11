@@ -10,7 +10,10 @@
       "Bash(npx expo doctor:*)",
       "Bash(npx expo-doctor:*)",
       "Bash(npx expo install:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(node -e:*)",
+      "Bash(adb uninstall:*)"
     ]
   }
 }
