@@ -17,4 +17,7 @@ export interface Todo {
     dateRangeEnd?: string;
 
     createdAt?: string;
+
+    authorUid?: string;
+    authorName?: string;
 }

@@ -44,6 +44,9 @@ export interface Group {
   memberNames: {          // uid -> 표시 이름 매핑
     [uid: string]: string;
   };
+  memberColors?: {        // uid -> 커스텀 색상 매핑
+    [uid: string]: string;
+  };
   createdAt: number;
 }
 

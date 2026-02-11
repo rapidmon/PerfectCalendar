@@ -1,14 +1,18 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Todo } from '../types/todo';
+import { getMemberColor } from '../utils/memberColors';
 
 interface TodoItemProps {
     todo: Todo;
     onToggle: (id: string) => void;
     selectedDate: Date;
+    isGroupConnected?: boolean;
+    memberUids?: string[];
+    memberColors?: { [uid: string]: string };
 }
 
-export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps) {
+export default function TodoItem({ todo, onToggle, selectedDate, isGroupConnected = false, memberUids = [], memberColors: customColors }: TodoItemProps) {
     const getDateText = () => {
         switch (todo.type) {
         case 'RECURRING':
@@ -63,6 +67,9 @@ export default function TodoItem({ todo, onToggle, selectedDate }: TodoItemProps
             </TouchableOpacity>
 
             <View style={styles.content}>
+                {isGroupConnected && todo.authorUid ? (
+                    <View style={[styles.authorDot, { backgroundColor: getMemberColor(todo.authorUid, memberUids, customColors) }]} />
+                ) : null}
                 <Text style={[
                 styles.title,
                 todo.completed && styles.titleCompleted
@@ -107,6 +114,12 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between'
+    },
+    authorDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        marginRight: 5,
     },
     title: {
         fontSize: 14,

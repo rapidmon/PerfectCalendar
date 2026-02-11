@@ -12,7 +12,8 @@ interface BudgetListProps {
 }
 
 export default function BudgetList({ selectedDate }: BudgetListProps) {
-    const { budgets, categories, accounts, isGroupConnected, store } = useAppData();
+    const { budgets, categories, accounts, isGroupConnected, memberNames, memberColors, store } = useAppData();
+    const memberUids = Object.keys(memberNames);
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -101,6 +102,8 @@ export default function BudgetList({ selectedDate }: BudgetListProps) {
                             budget={budget}
                             accounts={accounts}
                             isGroupConnected={isGroupConnected}
+                            memberUids={memberUids}
+                            memberColors={memberColors}
                             onPress={() => handleBudgetPress(budget)}
                         />
                     ))

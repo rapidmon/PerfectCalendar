@@ -88,11 +88,14 @@ export class AppDataStore {
     private _groupCode: string | null = null;
     private _userName: string | null = null;
     private _memberNames: { [uid: string]: string } = {};
+    private _memberColors: { [uid: string]: string } = {};
     private _budgetUnsubscribe: Unsubscribe | null = null;
     private _todoUnsubscribe: Unsubscribe | null = null;
     private _accountUnsubscribe: Unsubscribe | null = null;
     private _categoryUnsubscribe: Unsubscribe | null = null;
     private _groupUnsubscribe: Unsubscribe | null = null;
+    private _syncInProgress = false;
+    private _fixingOrphans = false;
 
     private _saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private _listeners = new Set<Listener>();
@@ -115,6 +118,7 @@ export class AppDataStore {
     get groupCode(): string | null { return this._groupCode; }
     get userName(): string | null { return this._userName; }
     get memberNames(): { [uid: string]: string } { return this._memberNames; }
+    get memberColors(): { [uid: string]: string } { return this._memberColors; }
 
     // ── Observer Pattern ───────────────────────────────────────
     subscribe(listener: Listener): () => void {
@@ -220,6 +224,9 @@ export class AppDataStore {
     }
 
     async startGroupSync(): Promise<void> {
+        if (this._syncInProgress) return;
+        this._syncInProgress = true;
+
         try {
             await ensureAuthenticated();
             const groupCode = await getCurrentGroupCode();
@@ -234,70 +241,84 @@ export class AppDataStore {
             // 기존 구독 해제
             this.stopGroupSync();
 
-            // Budget 실시간 구독
-            this._budgetUnsubscribe = await subscribeToSharedBudgetsAsync(
-                (sharedBudgets: SharedBudget[]) => {
-                    this._budgets = sharedBudgets.map(sb => this.sharedBudgetToLocal(sb));
-                    this.notify();
-                },
-                (error) => console.error('Budget sync error:', error)
-            ) || null;
+            // 5개 구독을 병렬로 초기화
+            const [budgetResult, todoResult, accountResult, categoryResult, groupResult] = await Promise.allSettled([
+                subscribeToSharedBudgetsAsync(
+                    (sharedBudgets: SharedBudget[]) => {
+                        this._budgets = sharedBudgets.map(sb => this.sharedBudgetToLocal(sb));
+                        this.notify();
+                    },
+                    (error) => console.error('Budget sync error:', error)
+                ),
+                subscribeToSharedTodosAsync(
+                    (sharedTodos: SharedTodo[]) => {
+                        this._todos = sharedTodos.map(st => this.sharedTodoToLocal(st));
+                        this.notify();
+                    },
+                    (error) => console.error('Todo sync error:', error)
+                ),
+                subscribeToSharedAccountsAsync(
+                    (sharedAccounts: SharedAccounts) => {
+                        this._accounts = sharedAccounts.accounts || [];
+                        this._accountBalances = sharedAccounts.balances || {};
+                        this._accountOwners = sharedAccounts.owners || {};
 
-            // Todo 실시간 구독
-            this._todoUnsubscribe = await subscribeToSharedTodosAsync(
-                (sharedTodos: SharedTodo[]) => {
-                    this._todos = sharedTodos.map(st => this.sharedTodoToLocal(st));
-                    this.notify();
-                },
-                (error) => console.error('Todo sync error:', error)
-            ) || null;
-
-            // 통장 실시간 구독
-            this._accountUnsubscribe = await subscribeToSharedAccountsAsync(
-                (sharedAccounts: SharedAccounts) => {
-                    this._accounts = sharedAccounts.accounts || [];
-                    this._accountBalances = sharedAccounts.balances || {};
-                    this._accountOwners = sharedAccounts.owners || {};
-
-                    // 소유자 없는 통장 보정: 현재 사용자로 할당
-                    const uid = getCurrentUid();
-                    if (uid && this._accounts.length > 0) {
-                        const orphaned = this._accounts.filter(acc => !this._accountOwners[acc]);
-                        if (orphaned.length > 0) {
-                            for (const acc of orphaned) {
-                                this._accountOwners[acc] = uid;
+                        // 소유자 없는 통장 보정: 현재 사용자로 할당 (무한 루프 방지)
+                        const uid = getCurrentUid();
+                        if (uid && this._accounts.length > 0 && !this._fixingOrphans) {
+                            const orphaned = this._accounts.filter(acc => !this._accountOwners[acc]);
+                            if (orphaned.length > 0) {
+                                for (const acc of orphaned) {
+                                    this._accountOwners[acc] = uid;
+                                }
+                                this._fixingOrphans = true;
+                                saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners)
+                                    .catch(console.error)
+                                    .finally(() => { this._fixingOrphans = false; });
                             }
-                            saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners).catch(console.error);
                         }
-                    }
 
-                    this.notify();
-                },
-                (error) => console.error('Account sync error:', error)
-            ) || null;
+                        this.notify();
+                    },
+                    (error) => console.error('Account sync error:', error)
+                ),
+                subscribeToSharedCategoriesAsync(
+                    (shared: SharedCategories) => {
+                        this._categories = shared.categories || [];
+                        this._fixedCategories = shared.fixedCategories || [];
+                        this.notify();
+                    },
+                    (error) => console.error('Category sync error:', error)
+                ),
+                subscribeToGroupAsync(
+                    (group: Group) => {
+                        this._memberNames = group.memberNames || {};
+                        this._memberColors = group.memberColors || {};
+                        this.notify();
+                    },
+                    (error) => console.error('Group member sync error:', error)
+                ),
+            ]);
 
-            // 카테고리 실시간 구독
-            this._categoryUnsubscribe = await subscribeToSharedCategoriesAsync(
-                (shared: SharedCategories) => {
-                    this._categories = shared.categories || [];
-                    this._fixedCategories = shared.fixedCategories || [];
-                    this.notify();
-                },
-                (error) => console.error('Category sync error:', error)
-            ) || null;
+            // fulfilled인 것만 unsubscribe 할당
+            this._budgetUnsubscribe = budgetResult.status === 'fulfilled' ? (budgetResult.value || null) : null;
+            this._todoUnsubscribe = todoResult.status === 'fulfilled' ? (todoResult.value || null) : null;
+            this._accountUnsubscribe = accountResult.status === 'fulfilled' ? (accountResult.value || null) : null;
+            this._categoryUnsubscribe = categoryResult.status === 'fulfilled' ? (categoryResult.value || null) : null;
+            this._groupUnsubscribe = groupResult.status === 'fulfilled' ? (groupResult.value || null) : null;
 
-            // 그룹 멤버 실시간 구독
-            this._groupUnsubscribe = await subscribeToGroupAsync(
-                (group: Group) => {
-                    this._memberNames = group.memberNames || {};
-                    this.notify();
-                },
-                (error) => console.error('Group member sync error:', error)
-            ) || null;
+            // rejected 경고 로그
+            if (budgetResult.status === 'rejected') console.warn('Budget subscription failed:', budgetResult.reason);
+            if (todoResult.status === 'rejected') console.warn('Todo subscription failed:', todoResult.reason);
+            if (accountResult.status === 'rejected') console.warn('Account subscription failed:', accountResult.reason);
+            if (categoryResult.status === 'rejected') console.warn('Category subscription failed:', categoryResult.reason);
+            if (groupResult.status === 'rejected') console.warn('Group subscription failed:', groupResult.reason);
 
             this.notify();
         } catch (error) {
             console.error('Start group sync error:', error);
+        } finally {
+            this._syncInProgress = false;
         }
     }
 
@@ -334,6 +355,7 @@ export class AppDataStore {
         this._groupCode = null;
         this._userName = null;
         this._memberNames = {};
+        this._memberColors = {};
 
         // 내가 작성한 데이터만 Firebase에서 가져오기
         if (groupCode) {
@@ -425,6 +447,8 @@ export class AppDataStore {
             dateRangeStart: st.dateRangeStart,
             dateRangeEnd: st.dateRangeEnd,
             createdAt: new Date(st.createdAt).toISOString(),
+            authorUid: st.author,
+            authorName: st.authorName,
         };
     }
 

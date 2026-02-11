@@ -4,6 +4,7 @@ import AddTodoModal from './AddTodoModal';
 import TodoActionModal from './TodoActionModal';
 import { Todo, TodoType } from '../types/todo';
 import { useAppData } from '../contexts/AppDataContext';
+import { getMemberColor } from '../utils/memberColors';
 
 interface TodoFullListProps {
     selectedDate: Date;
@@ -97,7 +98,8 @@ const formatLocalDate = (date: Date) => {
 };
 
 export default function TodoFullList({ selectedDate }: TodoFullListProps) {
-    const { todos, store } = useAppData();
+    const { todos, store, isGroupConnected, memberNames, memberColors } = useAppData();
+    const memberUids = Object.keys(memberNames);
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -211,6 +213,9 @@ export default function TodoFullList({ selectedDate }: TodoFullListProps) {
                         >
                             {item.todo.completed && <View style={styles.checkmark} />}
                         </TouchableOpacity>
+                        {isGroupConnected && item.todo.authorUid ? (
+                            <View style={[styles.authorDot, { backgroundColor: getMemberColor(item.todo.authorUid, memberUids, memberColors) }]} />
+                        ) : null}
                         <Text style={[
                             styles.cardTitle,
                             item.todo.completed && styles.cardTitleCompleted,
@@ -354,6 +359,12 @@ const styles = StyleSheet.create({
         height: 8,
         backgroundColor: '#4A90E2',
         borderRadius: 4,
+    },
+    authorDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        marginRight: 5,
     },
     cardTitle: {
         flex: 1,

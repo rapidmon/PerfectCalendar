@@ -2,40 +2,23 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Budget } from '../types/budget';
 import { formatMoney } from '../utils/format';
+import { getMemberColor } from '../utils/memberColors';
 
 const ACCOUNT_COLORS = [
     '#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C',
     '#1ABC9C', '#F39C12', '#3498DB', '#D35400', '#2ECC71',
 ];
 
-// 소유자별 색상 (멤버 구분용)
-const OWNER_COLORS = [
-    '#4A90E2', // 파랑
-    '#E91E63', // 핑크
-    '#9C27B0', // 보라
-    '#FF9800', // 주황
-    '#009688', // 청록
-    '#795548', // 갈색
-];
-
-// uid를 기반으로 일관된 색상 인덱스 생성
-const getOwnerColorIndex = (uid: string): number => {
-    let hash = 0;
-    for (let i = 0; i < uid.length; i++) {
-        hash = ((hash << 5) - hash) + uid.charCodeAt(i);
-        hash = hash & hash;
-    }
-    return Math.abs(hash) % OWNER_COLORS.length;
-};
-
 interface BudgetItemProps {
     budget: Budget;
     accounts: string[];
     isGroupConnected?: boolean;
+    memberUids?: string[];
+    memberColors?: { [uid: string]: string };
     onPress: () => void;
 }
 
-export default function BudgetItem({ budget, accounts, isGroupConnected = false, onPress }: BudgetItemProps) {
+export default function BudgetItem({ budget, accounts, isGroupConnected = false, memberUids = [], memberColors: customColors, onPress }: BudgetItemProps) {
     const accountIndex = budget.account ? accounts.indexOf(budget.account) : -1;
     const accountNumber = accountIndex >= 0 ? accountIndex + 1 : null;
     const accountColor = accountNumber ? ACCOUNT_COLORS[(accountNumber - 1) % ACCOUNT_COLORS.length] : '#999';
@@ -48,7 +31,7 @@ export default function BudgetItem({ budget, accounts, isGroupConnected = false,
             <View style={styles.leftSection}>
                 <View style={styles.titleRow}>
                     {isGroupConnected && budget.authorUid ? (
-                        <View style={[styles.ownerDot, { backgroundColor: OWNER_COLORS[getOwnerColorIndex(budget.authorUid)] }]} />
+                        <View style={[styles.ownerDot, { backgroundColor: getMemberColor(budget.authorUid, memberUids, customColors) }]} />
                     ) : null}
                     <Text style={styles.title}>{budget.title}</Text>
                 </View>

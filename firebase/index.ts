@@ -15,7 +15,8 @@ export {
   getGroupInfo,
   leaveGroup,
   isGroupConnected,
-  subscribeToGroupAsync
+  subscribeToGroupAsync,
+  saveMemberColor
 } from './groupService';
 
 // 가계부 서비스

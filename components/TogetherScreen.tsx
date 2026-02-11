@@ -16,6 +16,7 @@ import {
   joinGroup,
   getCurrentGroupCode,
   getCurrentUserName,
+  getCurrentUid,
   getGroupInfo,
   leaveGroup,
   ensureAuthenticated,
@@ -23,35 +24,18 @@ import {
   uploadLocalTodos,
   uploadLocalAccounts,
   uploadLocalCategories,
+  getSharedCategories,
   subscribeToGroupAsync,
+  saveMemberColor,
   Group
 } from '../firebase';
 import { useAppData } from '../contexts/AppDataContext';
+import { getMemberColor, MEMBER_COLORS } from '../utils/memberColors';
 
 type ScreenMode = 'loading' | 'not_connected' | 'connected';
 
-// 소유자별 색상 (멤버 구분용)
-const OWNER_COLORS = [
-    '#4A90E2', // 파랑
-    '#E91E63', // 핑크
-    '#9C27B0', // 보라
-    '#FF9800', // 주황
-    '#009688', // 청록
-    '#795548', // 갈색
-];
-
-// uid를 기반으로 일관된 색상 인덱스 생성
-const getOwnerColorIndex = (uid: string): number => {
-    let hash = 0;
-    for (let i = 0; i < uid.length; i++) {
-        hash = ((hash << 5) - hash) + uid.charCodeAt(i);
-        hash = hash & hash;
-    }
-    return Math.abs(hash) % OWNER_COLORS.length;
-};
-
 export default function TogetherScreen() {
-  const { store, budgets, todos, accounts, accountBalances, categories, fixedCategories } = useAppData();
+  const { store, budgets, todos, accounts, accountBalances, categories, fixedCategories, memberColors } = useAppData();
   const [mode, setMode] = useState<ScreenMode>('loading');
   const [showJoinInput, setShowJoinInput] = useState(false);
   const [showCreateInput, setShowCreateInput] = useState(false);
@@ -63,6 +47,7 @@ export default function TogetherScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadExisting, setUploadExisting] = useState(true);
   const [groupUnsubscribe, setGroupUnsubscribe] = useState<(() => void) | null>(null);
+  const [colorPickerUid, setColorPickerUid] = useState<string | null>(null);
 
   useEffect(() => {
     checkConnectionStatus();
@@ -206,6 +191,20 @@ export default function TogetherScreen() {
         );
         setGroupUnsubscribe(() => unsub);
 
+        // 참여 시 로컬 카테고리를 원격과 병합 후 업로드
+        if (categories.length > 0) {
+          const existingShared = await getSharedCategories();
+          const mergedCategories = [...new Set([
+            ...(existingShared?.categories || []),
+            ...categories,
+          ])];
+          const mergedFixed = [...new Set([
+            ...(existingShared?.fixedCategories || []),
+            ...fixedCategories,
+          ])];
+          await uploadLocalCategories(mergedCategories, mergedFixed);
+        }
+
         // Store에서 그룹 동기화 시작
         await store.startGroupSync();
 
@@ -291,11 +290,45 @@ export default function TogetherScreen() {
             <View style={styles.memberList}>
               {groupInfo?.members.map((uid) => {
                 const name = groupInfo.memberNames?.[uid] || '알 수 없음';
-                const color = OWNER_COLORS[getOwnerColorIndex(uid)];
+                const color = getMemberColor(uid, groupInfo.members, memberColors);
+                const currentUid = getCurrentUid();
+                const isMe = uid === currentUid;
                 return (
-                  <View key={uid} style={styles.memberItem}>
-                    <View style={[styles.memberColorDot, { backgroundColor: color }]} />
-                    <Text style={styles.memberName}>{name}</Text>
+                  <View key={uid}>
+                    <TouchableOpacity
+                      style={styles.memberItem}
+                      onPress={() => isMe && setColorPickerUid(colorPickerUid === uid ? null : uid)}
+                      activeOpacity={isMe ? 0.7 : 1}
+                    >
+                      <View style={[styles.memberColorDot, { backgroundColor: color }]} />
+                      <Text style={styles.memberName}>{name}</Text>
+                    </TouchableOpacity>
+                    {colorPickerUid === uid && (
+                      <View style={styles.colorPickerRow}>
+                        {MEMBER_COLORS.map((c) => {
+                          const usedByOther = groupInfo.members.some(
+                            (otherUid) => otherUid !== uid && memberColors[otherUid] === c
+                          );
+                          const isSelected = memberColors[uid] === c;
+                          return (
+                            <TouchableOpacity
+                              key={c}
+                              style={[
+                                styles.colorOption,
+                                { backgroundColor: c },
+                                usedByOther && styles.colorOptionDisabled,
+                                isSelected && styles.colorOptionSelected,
+                              ]}
+                              disabled={usedByOther}
+                              onPress={() => {
+                                saveMemberColor(uid, c).catch(console.error);
+                                setColorPickerUid(null);
+                              }}
+                            />
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 );
               })}
@@ -667,9 +700,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E0E8F0',
   },
   memberList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 6,
     marginTop: 8,
   },
   memberItem: {
@@ -690,6 +721,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+  },
+  colorPickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  colorOption: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  colorOptionDisabled: {
+    opacity: 0.3,
+  },
+  colorOptionSelected: {
+    borderWidth: 3,
+    borderColor: '#333',
   },
   infoLabel: {
     fontSize: 15,

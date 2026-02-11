@@ -4,6 +4,8 @@ import {
   setDoc,
   updateDoc,
   arrayUnion,
+  arrayRemove,
+  deleteField,
   serverTimestamp,
   onSnapshot,
   Unsubscribe
@@ -118,8 +120,26 @@ export async function getGroupInfo(code: string): Promise<Group | null> {
   return { code, ...docSnap.data() } as Group;
 }
 
-// 그룹 나가기 (로컬 정보만 삭제)
+// 그룹 나가기 (Firebase에서 멤버 제거 + 로컬 정보 삭제)
 export async function leaveGroup(): Promise<void> {
+  const groupCode = await getCurrentGroupCode();
+  const uid = getCurrentUid();
+
+  // Firebase에서 멤버 제거
+  if (groupCode && uid) {
+    try {
+      const docRef = doc(db, 'groups', groupCode);
+      await updateDoc(docRef, {
+        members: arrayRemove(uid),
+        [`memberNames.${uid}`]: deleteField(),
+        [`memberColors.${uid}`]: deleteField(),
+      });
+    } catch (error) {
+      console.error('Firebase 멤버 제거 실패:', error);
+    }
+  }
+
+  // 로컬 정보 삭제
   await AsyncStorage.removeItem(GROUP_CODE_KEY);
   await AsyncStorage.removeItem(USER_NAME_KEY);
 }
@@ -128,6 +148,14 @@ export async function leaveGroup(): Promise<void> {
 export async function isGroupConnected(): Promise<boolean> {
   const code = await getCurrentGroupCode();
   return code !== null;
+}
+
+// 멤버 커스텀 색상 저장
+export async function saveMemberColor(uid: string, color: string): Promise<boolean> {
+  const groupCode = await getCurrentGroupCode();
+  if (!groupCode) return false;
+  await updateDoc(doc(db, 'groups', groupCode), { [`memberColors.${uid}`]: color });
+  return true;
 }
 
 // 그룹 실시간 구독

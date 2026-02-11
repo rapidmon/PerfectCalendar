@@ -18,7 +18,7 @@ interface BudgetFullListProps {
 }
 
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
-    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, accountOwners, memberNames, isGroupConnected, store } = useAppData();
+    const { budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, accountOwners, memberNames, memberColors, isGroupConnected, store } = useAppData();
 
     const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
     const [viewMonth, setViewMonth] = useState(selectedDate.getMonth() + 1);
@@ -148,7 +148,7 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 </View>
                 <TouchableOpacity
                     style={styles.settingsButton}
-                    onPress={() => setSettingsMenuVisible(true)}
+                    onPress={() => { if (!isTutorialActive) setSettingsMenuVisible(true); }}
                 >
                     <Text style={styles.settingsButtonText}>⚙</Text>
                 </TouchableOpacity>
@@ -164,6 +164,8 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                     goalAmount={monthlyGoals[monthKey]}
                     accountBalances={accountBalanceList}
                     isGroupConnected={isGroupConnected}
+                    memberUids={Object.keys(memberNames)}
+                    memberColors={memberColors}
                 />
 
                 <MonthlyChartCard chartData={chartData} />
@@ -192,6 +194,7 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 initialBalances={accountBalances}
                 accountOwners={accountOwners}
                 memberNames={memberNames}
+                memberColors={memberColors}
                 isGroupConnected={isGroupConnected}
                 onClose={() => setAccountManageModalVisible(false)}
                 onSave={handleSaveAccounts}

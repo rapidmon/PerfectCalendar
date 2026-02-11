@@ -2,26 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MonthlyStats, computeYoYGrowthRate } from '../utils/budgetAnalytics';
 import { Budget } from '../types/budget';
-
-// 소유자별 색상 (멤버 구분용)
-const OWNER_COLORS = [
-    '#4A90E2', // 파랑
-    '#E91E63', // 핑크
-    '#9C27B0', // 보라
-    '#FF9800', // 주황
-    '#009688', // 청록
-    '#795548', // 갈색
-];
-
-// uid를 기반으로 일관된 색상 인덱스 생성
-const getOwnerColorIndex = (uid: string): number => {
-    let hash = 0;
-    for (let i = 0; i < uid.length; i++) {
-        hash = ((hash << 5) - hash) + uid.charCodeAt(i);
-        hash = hash & hash;
-    }
-    return Math.abs(hash) % OWNER_COLORS.length;
-};
+import { getMemberColor } from '../utils/memberColors';
 
 interface MonthlySummaryCardProps {
     year: number;
@@ -32,6 +13,8 @@ interface MonthlySummaryCardProps {
     goalAmount: number | undefined;
     accountBalances: { name: string; balance: number; ownerUid?: string }[];
     isGroupConnected?: boolean;
+    memberUids?: string[];
+    memberColors?: { [uid: string]: string };
 }
 
 export default function MonthlySummaryCard({
@@ -43,6 +26,8 @@ export default function MonthlySummaryCard({
     goalAmount,
     accountBalances,
     isGroupConnected = false,
+    memberUids = [],
+    memberColors: customColors,
 }: MonthlySummaryCardProps) {
     const [expenseExpanded, setExpenseExpanded] = useState(false);
 
@@ -82,7 +67,7 @@ export default function MonthlySummaryCard({
                     <Text style={styles.sectionTitle}>통장별 잔액</Text>
                     {accountBalances.map(item => {
                         const ownerColor = isGroupConnected && item.ownerUid
-                            ? OWNER_COLORS[getOwnerColorIndex(item.ownerUid)]
+                            ? getMemberColor(item.ownerUid, memberUids, customColors)
                             : undefined;
                         return (
                             <View key={item.name} style={styles.accountRow}>

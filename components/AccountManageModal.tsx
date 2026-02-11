@@ -1,20 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { AccountBalances } from '../types/budget';
 import { AccountOwnership } from '../firebase';
+import { getMemberColor } from '../utils/memberColors';
 
 const ACCOUNT_COLORS = [
     '#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C',
     '#1ABC9C', '#F39C12', '#3498DB', '#D35400', '#2ECC71',
 ];
-
-// 멤버별 고유 색상 (UID 기반)
-const MEMBER_COLORS = ['#5B9BD5', '#E67E22', '#27AE60', '#8E44AD', '#E74C3C', '#1ABC9C'];
-
-function getMemberColor(uid: string, allUids: string[]): string {
-    const idx = allUids.indexOf(uid);
-    return MEMBER_COLORS[idx >= 0 ? idx % MEMBER_COLORS.length : 0];
-}
 
 interface AccountItem {
     key: string;
@@ -27,6 +20,7 @@ interface AccountManageModalProps {
     initialBalances: AccountBalances;
     accountOwners?: AccountOwnership;
     memberNames?: { [uid: string]: string };
+    memberColors?: { [uid: string]: string };
     isGroupConnected?: boolean;
     onClose: () => void;
     onSave: (accounts: string[], balances: AccountBalances, owners?: AccountOwnership) => void;
@@ -38,6 +32,7 @@ export default function AccountManageModal({
     initialBalances,
     accountOwners = {},
     memberNames = {},
+    memberColors: customColors,
     isGroupConnected = false,
     onClose,
     onSave,
@@ -204,7 +199,7 @@ export default function AccountManageModal({
         // 그룹 모드에서는 소유자 색상 사용, 아니면 인덱스 기반 색상
         const ownerUid = localOwners[item.name];
         const color = isGroupConnected && ownerUid
-            ? getMemberColor(ownerUid, memberUids)
+            ? getMemberColor(ownerUid, memberUids, customColors)
             : ACCOUNT_COLORS[index % ACCOUNT_COLORS.length];
         const ownerName = ownerUid ? (memberNames[ownerUid] || '알 수 없음') : '';
         const isPickerOpen = ownerPickerAccount === item.name;
@@ -284,7 +279,7 @@ export default function AccountManageModal({
                 {isGroupConnected && isPickerOpen && (
                     <View style={styles.ownerPicker}>
                         {memberUids.map(uid => {
-                            const memberColor = getMemberColor(uid, memberUids);
+                            const memberColor = getMemberColor(uid, memberUids, customColors);
                             const isSelected = localOwners[item.name] === uid;
                             return (
                                 <TouchableOpacity
@@ -308,7 +303,7 @@ export default function AccountManageModal({
 
     return (
         <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-            <View style={styles.overlay}>
+            <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <View style={styles.modalContainer}>
                     <Text style={styles.modalTitle}>통장 관리</Text>
                     <Text style={styles.hintText}>▲ ▼ 버튼으로 순서를 변경하세요</Text>
@@ -343,7 +338,7 @@ export default function AccountManageModal({
                         </TouchableOpacity>
                     </View>
                 </View>
-            </View>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }

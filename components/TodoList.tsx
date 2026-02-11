@@ -19,7 +19,8 @@ const formatLocalDate = (date: Date) => {
 };
 
 export default function TodoList({ selectedDate }: TodoListProps) {
-    const { todos, store } = useAppData();
+    const { todos, store, isGroupConnected, memberNames, memberColors } = useAppData();
+    const memberUids = Object.keys(memberNames);
 
     const [addModalVisible, setAddModalVisible] = useState(false);
     const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -183,6 +184,9 @@ export default function TodoList({ selectedDate }: TodoListProps) {
                                 todo={todo}
                                 onToggle={handleToggleTodo}
                                 selectedDate={selectedDate}
+                                isGroupConnected={isGroupConnected}
+                                memberUids={memberUids}
+                                memberColors={memberColors}
                             />
                         </TouchableOpacity>
                     ))
