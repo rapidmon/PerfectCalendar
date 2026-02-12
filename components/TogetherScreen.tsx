@@ -261,14 +261,6 @@ export default function TogetherScreen() {
     }
   };
 
-  if (mode === 'loading') {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#4A90E2" />
-      </View>
-    );
-  }
-
   // 색상 선택 UI 최적화: 다른 멤버가 사용 중인 색상 set을 미리 계산
   const currentUid = getCurrentUid();
   const usedColorsByUid = useMemo(() => {
@@ -285,6 +277,14 @@ export default function TogetherScreen() {
     }
     return map;
   }, [groupInfo?.members, memberColors]);
+
+  if (mode === 'loading') {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#4A90E2" />
+      </View>
+    );
+  }
 
   if (mode === 'connected') {
     const memberCount = groupInfo?.members.length || 0;
