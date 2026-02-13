@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
+import { getHolidays } from '../services/holidayService';
 
 interface CalendarViewProps {
     selectedDate: Date;
@@ -34,9 +35,14 @@ function isToday(year: number, month: number, day: number): boolean {
 export default function CalendarView({ selectedDate, onDateChange }: CalendarViewProps) {
     const [pickerVisible, setPickerVisible] = useState(false);
     const [pickerType, setPickerType] = useState<'year' | 'month'>('year');
+    const [holidays, setHolidays] = useState<Record<string, string>>({});
 
     const currentYear = selectedDate.getFullYear();
     const currentMonth = selectedDate.getMonth() + 1;
+
+    useEffect(() => {
+        getHolidays(currentYear, currentMonth).then(setHolidays).catch(() => {});
+    }, [currentYear, currentMonth]);
 
     const calendarRows = useMemo(() => {
         const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -138,6 +144,8 @@ export default function CalendarView({ selectedDate, onDateChange }: CalendarVie
                             const date = new Date(currentYear, currentMonth - 1, day);
                             const selected = isSameDay(date, selectedDate);
                             const today = isToday(currentYear, currentMonth, day);
+                            const dateKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                            const holidayName = holidays[dateKey];
 
                             return (
                                 <TouchableOpacity
@@ -154,10 +162,20 @@ export default function CalendarView({ selectedDate, onDateChange }: CalendarVie
                                             styles.dayText,
                                             colIdx === 0 && styles.sundayText,
                                             colIdx === 6 && styles.saturdayText,
+                                            !!holidayName && styles.sundayText,
                                             today && !selected && styles.todayText,
                                             selected && styles.daySelectedText,
                                         ]}>{day}</Text>
                                     </View>
+                                    {!!holidayName && (
+                                        <Text
+                                            style={[
+                                                styles.holidayText,
+                                                selected && styles.holidayTextSelected,
+                                            ]}
+                                            numberOfLines={1}
+                                        >{holidayName}</Text>
+                                    )}
                                 </TouchableOpacity>
                             );
                         })}
@@ -290,8 +308,9 @@ const styles = StyleSheet.create({
     dayCell: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         paddingVertical: 2,
+        minHeight: 46,
     },
     dayInner: {
         width: 34,
@@ -320,6 +339,15 @@ const styles = StyleSheet.create({
     },
     saturdayText: {
         color: '#2196F3',
+    },
+    holidayText: {
+        fontSize: 8,
+        color: '#F44336',
+        textAlign: 'center',
+        marginTop: -2,
+    },
+    holidayTextSelected: {
+        color: '#F44336',
     },
     // 모달
     modalOverlay: {
