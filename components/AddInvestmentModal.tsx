@@ -193,7 +193,7 @@ export default function AddInvestmentModal({
 
                         {/* 검색 결과 드롭다운 */}
                         {showResults && (
-                            <View style={styles.resultsList}>
+                            <ScrollView style={styles.resultsList} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                                 {searchResults.map((item) => {
                                     const flag = item.type === 'KOREA_STOCK' ? '🇰🇷' : '🇺🇸';
                                     return (
@@ -210,7 +210,7 @@ export default function AddInvestmentModal({
                                         </TouchableOpacity>
                                     );
                                 })}
-                            </View>
+                            </ScrollView>
                         )}
 
                         {/* 수량 */}
