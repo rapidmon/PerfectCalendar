@@ -122,6 +122,7 @@ const styles = StyleSheet.create({
         marginRight: 5,
     },
     title: {
+        flex: 1,
         fontSize: 14,
         color: '#333',
         marginBottom: 4,
