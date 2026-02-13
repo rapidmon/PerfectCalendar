@@ -25,6 +25,8 @@ import {
   uploadLocalAccounts,
   uploadLocalCategories,
   getSharedCategories,
+  getSharedAccounts,
+  saveSharedAccounts,
   subscribeToGroupAsync,
   saveMemberColor,
   Group
@@ -115,8 +117,13 @@ export default function TogetherScreen() {
         await uploadLocalCategories(categories, fixedCategories);
       }
 
+      // 통장도 항상 업로드 (그룹에 내 통장이 반영되어야 함)
+      if (accounts.length > 0) {
+        await uploadLocalAccounts(accounts, accountBalances);
+      }
+
       // 기존 데이터 업로드 (옵션 선택 시)
-      if (uploadExisting && (budgets.length > 0 || todos.length > 0 || accounts.length > 0)) {
+      if (uploadExisting && (budgets.length > 0 || todos.length > 0)) {
         let uploadMessage = '';
 
         if (budgets.length > 0) {
@@ -146,12 +153,6 @@ export default function TogetherScreen() {
           const todoCount = await uploadLocalTodos(todoData);
           if (uploadMessage) uploadMessage += ', ';
           uploadMessage += `할 일 ${todoCount}개`;
-        }
-
-        if (accounts.length > 0) {
-          await uploadLocalAccounts(accounts, accountBalances);
-          if (uploadMessage) uploadMessage += ', ';
-          uploadMessage += `통장 ${accounts.length}개`;
         }
 
         if (uploadMessage) {
@@ -208,6 +209,29 @@ export default function TogetherScreen() {
             ...fixedCategories,
           ])];
           await uploadLocalCategories(mergedCategories, mergedFixed);
+        }
+
+        // 참여 시 로컬 통장을 원격과 병합 후 업로드
+        if (accounts.length > 0) {
+          const existingAccounts = await getSharedAccounts();
+          const existingList = existingAccounts?.accounts || [];
+          const existingBalances = existingAccounts?.balances || {};
+          const existingOwners = existingAccounts?.owners || {};
+
+          const mergedAccounts = [...new Set([...existingList, ...accounts])];
+          const mergedBalances = { ...existingBalances };
+          const mergedOwners = { ...existingOwners };
+
+          const uid = getCurrentUid();
+          for (const acc of accounts) {
+            if (!(acc in mergedBalances)) {
+              mergedBalances[acc] = accountBalances[acc] || 0;
+            }
+            if (uid && !mergedOwners[acc]) {
+              mergedOwners[acc] = uid;
+            }
+          }
+          await saveSharedAccounts(mergedAccounts, mergedBalances, mergedOwners);
         }
 
         // Store에서 그룹 동기화 시작
