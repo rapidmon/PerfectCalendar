@@ -110,6 +110,11 @@ export default function TogetherScreen() {
       // Store에서 그룹 동기화 시작
       await store.startGroupSync();
 
+      // 카테고리는 그룹 공유 설정이므로 항상 업로드
+      if (categories.length > 0) {
+        await uploadLocalCategories(categories, fixedCategories);
+      }
+
       // 기존 데이터 업로드 (옵션 선택 시)
       if (uploadExisting && (budgets.length > 0 || todos.length > 0 || accounts.length > 0)) {
         let uploadMessage = '';
@@ -147,10 +152,6 @@ export default function TogetherScreen() {
           await uploadLocalAccounts(accounts, accountBalances);
           if (uploadMessage) uploadMessage += ', ';
           uploadMessage += `통장 ${accounts.length}개`;
-        }
-
-        if (categories.length > 0) {
-          await uploadLocalCategories(categories, fixedCategories);
         }
 
         if (uploadMessage) {
@@ -269,8 +270,8 @@ export default function TogetherScreen() {
     for (const uid of groupInfo.members) {
       const othersColors = new Set<string>();
       for (const otherUid of groupInfo.members) {
-        if (otherUid !== uid && memberColors[otherUid]) {
-          othersColors.add(memberColors[otherUid]);
+        if (otherUid !== uid) {
+          othersColors.add(getMemberColor(otherUid, groupInfo.members, memberColors));
         }
       }
       map.set(uid, othersColors);
