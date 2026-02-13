@@ -24,6 +24,8 @@ export {
   addSharedBudget,
   updateSharedBudget,
   deleteSharedBudget,
+  deleteSharedBudgetsBatch,
+  addSharedBudgetsBatch,
   subscribeToSharedBudgetsAsync,
   convertToSharedBudget,
   convertToLocalBudget,
@@ -36,6 +38,7 @@ export {
   addSharedTodo,
   updateSharedTodo,
   deleteSharedTodo,
+  deleteSharedTodosBatch,
   toggleSharedTodoComplete,
   subscribeToSharedTodosAsync,
   convertToSharedTodo,
@@ -62,3 +65,12 @@ export {
   uploadLocalCategories
 } from './categoryService';
 export type { SharedCategories } from './categoryService';
+
+// 고정지출 서비스
+export {
+  saveSharedFixedExpenses,
+  getSharedFixedExpenses,
+  subscribeToSharedFixedExpensesAsync,
+  uploadLocalFixedExpenses
+} from './fixedExpenseService';
+export type { SharedFixedExpenses } from './fixedExpenseService';

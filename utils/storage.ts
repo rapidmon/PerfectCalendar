@@ -4,6 +4,7 @@ import { Todo } from '../types/todo';
 import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
 import { Investment } from '../types/investment';
 import { Savings } from '../types/savings';
+import { FixedExpense } from '../types/fixedExpense';
 
 const IOS_APP_GROUP = 'group.com.perfectcalendar.app';
 
@@ -29,6 +30,8 @@ const ONBOARDING_COMPLETE_KEY = '@onboarding_complete';
 const BUDGET_TUTORIAL_COMPLETE_KEY = '@budget_tutorial_complete';
 const INVESTMENTS_KEY = '@investments';
 const SAVINGS_KEY = '@savings';
+const FIXED_EXPENSES_KEY = '@fixed_expense_schedules';
+const PREGROUP_ACCOUNTS_KEY = '@pregroup_accounts_backup';
 
 const DEFAULT_ACCOUNTS = ['기본'];
 
@@ -298,6 +301,63 @@ export const loadSavings = async (): Promise<Savings[]> => {
     } catch (e) {
         console.error('적금 불러오기 실패:', e);
         return [];
+    }
+};
+
+// 고정지출 스케줄 저장
+export const saveFixedExpenses = async (expenses: FixedExpense[]): Promise<void> => {
+    try {
+        const jsonValue = JSON.stringify(expenses);
+        await AsyncStorage.setItem(FIXED_EXPENSES_KEY, jsonValue);
+    } catch (e) {
+        console.error('고정지출 저장 실패:', e);
+    }
+};
+
+// 고정지출 스케줄 불러오기
+export const loadFixedExpenses = async (): Promise<FixedExpense[]> => {
+    try {
+        const jsonValue = await AsyncStorage.getItem(FIXED_EXPENSES_KEY);
+        if (jsonValue != null) {
+            return JSON.parse(jsonValue);
+        }
+        return [];
+    } catch (e) {
+        console.error('고정지출 불러오기 실패:', e);
+        return [];
+    }
+};
+
+// 그룹 연결 전 통장 백업 저장
+export const savePreGroupAccounts = async (accounts: string[], balances: AccountBalances): Promise<void> => {
+    try {
+        const jsonValue = JSON.stringify({ accounts, balances });
+        await AsyncStorage.setItem(PREGROUP_ACCOUNTS_KEY, jsonValue);
+    } catch (e) {
+        console.error('통장 백업 저장 실패:', e);
+    }
+};
+
+// 그룹 연결 전 통장 백업 불러오기
+export const loadPreGroupAccounts = async (): Promise<{ accounts: string[]; balances: AccountBalances } | null> => {
+    try {
+        const jsonValue = await AsyncStorage.getItem(PREGROUP_ACCOUNTS_KEY);
+        if (jsonValue != null) {
+            return JSON.parse(jsonValue);
+        }
+        return null;
+    } catch (e) {
+        console.error('통장 백업 불러오기 실패:', e);
+        return null;
+    }
+};
+
+// 그룹 연결 전 통장 백업 삭제
+export const clearPreGroupAccounts = async (): Promise<void> => {
+    try {
+        await AsyncStorage.removeItem(PREGROUP_ACCOUNTS_KEY);
+    } catch (e) {
+        console.error('통장 백업 삭제 실패:', e);
     }
 };
 

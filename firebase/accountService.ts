@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   onSnapshot,
+  runTransaction,
   Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
@@ -35,28 +36,30 @@ export async function saveSharedAccounts(
 
   const docRef = doc(db, 'groups', groupCode, 'settings', 'accounts');
 
-  // 기존 데이터 가져오기 (owners 병합용)
-  const existingDoc = await getDoc(docRef);
-  const existingOwners: AccountOwnership = existingDoc.exists()
-    ? (existingDoc.data().owners || {})
-    : {};
+  await runTransaction(db, async (transaction) => {
+    // 기존 데이터 가져오기 (owners 병합용)
+    const existingDoc = await transaction.get(docRef);
+    const existingOwners: AccountOwnership = existingDoc.exists()
+      ? (existingDoc.data().owners || {})
+      : {};
 
-  // 새 owners와 기존 owners 병합
-  const mergedOwners = { ...existingOwners, ...owners };
+    // 새 owners와 기존 owners 병합
+    const mergedOwners = { ...existingOwners, ...owners };
 
-  // 삭제된 통장의 owners 제거
-  const finalOwners: AccountOwnership = {};
-  for (const acc of accounts) {
-    if (mergedOwners[acc]) {
-      finalOwners[acc] = mergedOwners[acc];
+    // 삭제된 통장의 owners 제거
+    const finalOwners: AccountOwnership = {};
+    for (const acc of accounts) {
+      if (mergedOwners[acc]) {
+        finalOwners[acc] = mergedOwners[acc];
+      }
     }
-  }
 
-  await setDoc(docRef, {
-    accounts,
-    balances,
-    owners: finalOwners,
-    updatedAt: Date.now()
+    transaction.set(docRef, {
+      accounts,
+      balances,
+      owners: finalOwners,
+      updatedAt: Date.now()
+    });
   });
 
   return true;

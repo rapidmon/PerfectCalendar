@@ -9,6 +9,7 @@ import {
   where,
   getDocs,
   onSnapshot,
+  writeBatch,
   Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
@@ -149,21 +150,83 @@ export function convertToLocalBudget(
   };
 }
 
-// 기존 로컬 가계부 데이터 일괄 업로드
+// 기존 로컬 가계부 데이터 일괄 업로드 (배치 쓰기)
 export async function uploadLocalBudgets(
   budgets: Array<{ money: number; date: string; type: 'INCOME' | 'EXPENSE'; category: string; account?: string; title?: string }>
 ): Promise<number> {
+  const groupCode = await getCurrentGroupCode();
+  const userName = await getCurrentUserName();
+  const uid = getCurrentUid();
+  if (!groupCode || !userName || !uid) return 0;
+
+  const budgetsRef = collection(db, 'groups', groupCode, 'budgets');
   let uploadedCount = 0;
 
-  for (const budget of budgets) {
-    const sharedBudget = convertToSharedBudget(budget);
-    const result = await addSharedBudget(sharedBudget);
-    if (result) {
+  // Firestore 배치는 최대 500개
+  for (let i = 0; i < budgets.length; i += 500) {
+    const chunk = budgets.slice(i, i + 500);
+    const batch = writeBatch(db);
+
+    for (const budget of chunk) {
+      const sharedBudget = convertToSharedBudget(budget);
+      const newDocRef = doc(budgetsRef);
+      batch.set(newDocRef, {
+        ...sharedBudget,
+        author: uid,
+        authorName: userName,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
       uploadedCount++;
     }
+
+    await batch.commit();
   }
 
   return uploadedCount;
+}
+
+// 가계부 일괄 삭제 (배치)
+export async function deleteSharedBudgetsBatch(budgetIds: string[]): Promise<void> {
+  const groupCode = await getCurrentGroupCode();
+  if (!groupCode || budgetIds.length === 0) return;
+
+  for (let i = 0; i < budgetIds.length; i += 500) {
+    const chunk = budgetIds.slice(i, i + 500);
+    const batch = writeBatch(db);
+    for (const id of chunk) {
+      batch.delete(doc(db, 'groups', groupCode, 'budgets', id));
+    }
+    await batch.commit();
+  }
+}
+
+// 가계부 일괄 추가 (배치)
+export async function addSharedBudgetsBatch(
+  budgets: Array<Omit<SharedBudget, 'id' | 'author' | 'authorName' | 'createdAt' | 'updatedAt'>>
+): Promise<void> {
+  const groupCode = await getCurrentGroupCode();
+  const userName = await getCurrentUserName();
+  const uid = getCurrentUid();
+  if (!groupCode || !userName || !uid || budgets.length === 0) return;
+
+  const budgetsRef = collection(db, 'groups', groupCode, 'budgets');
+
+  for (let i = 0; i < budgets.length; i += 500) {
+    const chunk = budgets.slice(i, i + 500);
+    const batch = writeBatch(db);
+    for (const budget of chunk) {
+      const newDocRef = doc(budgetsRef);
+      batch.set(newDocRef, {
+        ...budget,
+        author: uid,
+        authorName: userName,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+    await batch.commit();
+  }
 }
 
 // 내가 작성한 가계부 데이터만 가져오기

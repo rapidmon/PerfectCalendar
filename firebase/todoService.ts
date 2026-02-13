@@ -9,6 +9,7 @@ import {
   where,
   getDocs,
   onSnapshot,
+  writeBatch,
   Unsubscribe
 } from 'firebase/firestore';
 import { db } from './config';
@@ -172,7 +173,7 @@ export function convertToLocalTodo(
   };
 }
 
-// 기존 로컬 할 일 데이터 일괄 업로드
+// 기존 로컬 할 일 데이터 일괄 업로드 (배치 쓰기)
 export async function uploadLocalTodos(
   todos: Array<{
     title: string;
@@ -186,17 +187,50 @@ export async function uploadLocalTodos(
     dateRangeEnd?: string;
   }>
 ): Promise<number> {
+  const groupCode = await getCurrentGroupCode();
+  const userName = await getCurrentUserName();
+  const uid = getCurrentUid();
+  if (!groupCode || !userName || !uid) return 0;
+
+  const todosRef = collection(db, 'groups', groupCode, 'todos');
   let uploadedCount = 0;
 
-  for (const todo of todos) {
-    const sharedTodo = convertToSharedTodo(todo);
-    const result = await addSharedTodo(sharedTodo);
-    if (result) {
+  for (let i = 0; i < todos.length; i += 500) {
+    const chunk = todos.slice(i, i + 500);
+    const batch = writeBatch(db);
+
+    for (const todo of chunk) {
+      const sharedTodo = convertToSharedTodo(todo);
+      const newDocRef = doc(todosRef);
+      batch.set(newDocRef, {
+        ...sharedTodo,
+        author: uid,
+        authorName: userName,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
       uploadedCount++;
     }
+
+    await batch.commit();
   }
 
   return uploadedCount;
+}
+
+// 할 일 일괄 삭제 (배치)
+export async function deleteSharedTodosBatch(todoIds: string[]): Promise<void> {
+  const groupCode = await getCurrentGroupCode();
+  if (!groupCode || todoIds.length === 0) return;
+
+  for (let i = 0; i < todoIds.length; i += 500) {
+    const chunk = todoIds.slice(i, i + 500);
+    const batch = writeBatch(db);
+    for (const id of chunk) {
+      batch.delete(doc(db, 'groups', groupCode, 'todos', id));
+    }
+    await batch.commit();
+  }
 }
 
 // 내가 작성한 할 일 데이터만 가져오기
