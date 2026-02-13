@@ -18,7 +18,7 @@ interface BudgetItemProps {
     onPress: () => void;
 }
 
-export default function BudgetItem({ budget, accounts, isGroupConnected = false, memberUids = [], memberColors: customColors, onPress }: BudgetItemProps) {
+function BudgetItem({ budget, accounts, isGroupConnected = false, memberUids = [], memberColors: customColors, onPress }: BudgetItemProps) {
     const accountIndex = budget.account ? accounts.indexOf(budget.account) : -1;
     const accountNumber = accountIndex >= 0 ? accountIndex + 1 : null;
     const accountColor = accountNumber ? ACCOUNT_COLORS[(accountNumber - 1) % ACCOUNT_COLORS.length] : '#999';
@@ -57,6 +57,8 @@ export default function BudgetItem({ budget, accounts, isGroupConnected = false,
         </TouchableOpacity>
     );
 }
+
+export default React.memo(BudgetItem);
 
 const styles = StyleSheet.create({
     container: {

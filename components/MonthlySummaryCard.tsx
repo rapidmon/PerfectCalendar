@@ -17,7 +17,7 @@ interface MonthlySummaryCardProps {
     memberColors?: { [uid: string]: string };
 }
 
-export default function MonthlySummaryCard({
+function MonthlySummaryCard({
     year,
     month,
     stats,
@@ -179,6 +179,8 @@ export default function MonthlySummaryCard({
         </View>
     );
 }
+
+export default React.memo(MonthlySummaryCard);
 
 const styles = StyleSheet.create({
     card: {

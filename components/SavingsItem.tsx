@@ -14,7 +14,7 @@ interface SavingsItemProps {
     onPress: () => void;
 }
 
-export default function SavingsItem({ savings, onPress }: SavingsItemProps) {
+function SavingsItem({ savings, onPress }: SavingsItemProps) {
     const progress = getSavingsProgress(savings);
     const daysRemaining = getDaysRemaining(savings);
     const currentAmount = getCurrentPaidAmount(savings);
@@ -87,6 +87,8 @@ export default function SavingsItem({ savings, onPress }: SavingsItemProps) {
         </TouchableOpacity>
     );
 }
+
+export default React.memo(SavingsItem);
 
 const styles = StyleSheet.create({
     container: {

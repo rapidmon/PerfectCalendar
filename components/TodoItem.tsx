@@ -12,7 +12,7 @@ interface TodoItemProps {
     memberColors?: { [uid: string]: string };
 }
 
-export default function TodoItem({ todo, onToggle, selectedDate, isGroupConnected = false, memberUids = [], memberColors: customColors }: TodoItemProps) {
+function TodoItem({ todo, onToggle, selectedDate, isGroupConnected = false, memberUids = [], memberColors: customColors }: TodoItemProps) {
     const getDateText = () => {
         switch (todo.type) {
         case 'RECURRING':
@@ -83,6 +83,8 @@ export default function TodoItem({ todo, onToggle, selectedDate, isGroupConnecte
         </View>
     );
     }
+
+export default React.memo(TodoItem);
 
 const styles = StyleSheet.create({
     container: {

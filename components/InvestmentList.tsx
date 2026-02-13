@@ -11,7 +11,7 @@ interface InvestmentListProps {
     onItemPress: (investment: Investment) => void;
 }
 
-export default function InvestmentList({
+function InvestmentList({
     investments,
     prices,
     onAddPress,
@@ -66,6 +66,8 @@ export default function InvestmentList({
         </View>
     );
 }
+
+export default React.memo(InvestmentList);
 
 const styles = StyleSheet.create({
     container: {
