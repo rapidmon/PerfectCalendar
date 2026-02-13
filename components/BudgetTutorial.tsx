@@ -7,7 +7,7 @@ import {
     Modal,
 } from 'react-native';
 
-export type TutorialStep = 0 | 1 | 2 | 3 | 4; // 0: 설정버튼, 1: 목표, 2: 카테고리, 3: 통장, 4: 완료
+export type TutorialStep = 0 | 1 | 2 | 3 | 4 | 5; // 0: 설정버튼, 1: 목표, 2: 카테고리, 3: 통장, 4: 고정지출, 5: 완료
 
 interface BudgetTutorialProps {
     visible: boolean;
@@ -19,8 +19,8 @@ interface BudgetTutorialProps {
 const STEP_INFO = [
     {
         title: '가계부 설정',
-        description: '여기서 가계부의 다양한 설정을 관리할 수 있어요.',
-        action: '⚙ 버튼을 눌러보세요!',
+        description: '오른쪽 상단 ⚙ 버튼으로 가계부의 다양한 설정을 관리할 수 있어요.',
+        action: '다음',
     },
     {
         title: '지출 목표 설정',
@@ -35,6 +35,11 @@ const STEP_INFO = [
     {
         title: '통장 관리',
         description: '사용하는 통장들을 등록하면 통장별 잔액 관리가 가능해요.',
+        action: '다음',
+    },
+    {
+        title: '고정지출 관리',
+        description: '월세, 보험료 등 매월 반복되는 지출을 등록하면 자동으로 가계부에 추가돼요.',
         action: '완료',
     },
 ];
@@ -45,7 +50,7 @@ export default function BudgetTutorial({
     onNext,
     onSkip,
 }: BudgetTutorialProps) {
-    if (!visible || step >= 4) return null;
+    if (!visible || step >= 5) return null;
 
     const info = STEP_INFO[step];
 
@@ -54,7 +59,7 @@ export default function BudgetTutorial({
             <View style={styles.overlay}>
                 <View style={styles.card}>
                     <View style={styles.stepBadge}>
-                        <Text style={styles.stepText}>{step + 1} / 4</Text>
+                        <Text style={styles.stepText}>{step + 1} / 5</Text>
                     </View>
 
                     <Text style={styles.title}>{info.title}</Text>

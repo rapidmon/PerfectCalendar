@@ -11,6 +11,9 @@ export interface SharedBudget {
   authorName: string;     // 작성자 표시 이름
   createdAt: number;      // timestamp
   updatedAt: number;      // timestamp
+  savingsId?: string;             // 적금 연결 ID
+  savingsPaymentDate?: string;    // 적금 납입 월 "YYYY-MM"
+  fixedExpenseId?: string;        // 고정지출 연결 ID
 }
 
 // Firestore에 저장되는 공유 할 일 타입

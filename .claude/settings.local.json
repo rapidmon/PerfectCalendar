@@ -14,7 +14,12 @@
       "Bash(npm uninstall:*)",
       "Bash(node -e:*)",
       "Bash(adb uninstall:*)",
-      "WebFetch(domain:apis.data.go.kr)"
+      "WebFetch(domain:apis.data.go.kr)",
+      "Bash(npm run:*)",
+      "Bash(adb shell pm:*)",
+      "Bash(npx expo run:android)",
+      "Bash(npx kill-port:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }

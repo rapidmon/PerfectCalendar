@@ -12,6 +12,7 @@ export interface Budget {
     authorName?: string;     // 공유 가계부 작성자 이름
     savingsId?: string;      // 적금 자동납입인 경우 적금 ID
     savingsPaymentDate?: string;  // 적금 납입 해당 월 (YYYY-MM)
+    fixedExpenseId?: string; // 고정지출 자동생성인 경우 고정지출 ID
 }
 
 export interface MonthlyGoal {

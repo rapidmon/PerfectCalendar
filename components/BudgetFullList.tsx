@@ -5,6 +5,7 @@ import MonthlyChartCard from './MonthlyChartCard';
 import SetGoalModal from './SetGoalModal';
 import CategoryManageModal from './CategoryManageModal';
 import AccountManageModal from './AccountManageModal';
+import FixedExpenseManageModal from './FixedExpenseManageModal';
 import OverallStatsModal from './OverallStatsModal';
 import BudgetTutorial, { TutorialStep } from './BudgetTutorial';
 import { AccountBalances } from '../types/budget';
@@ -30,10 +31,11 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     const [goalModalVisible, setGoalModalVisible] = useState(false);
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [accountManageModalVisible, setAccountManageModalVisible] = useState(false);
+    const [fixedExpenseModalVisible, setFixedExpenseModalVisible] = useState(false);
     const [overallStatsVisible, setOverallStatsVisible] = useState(false);
 
     // 튜토리얼 상태 (0: 설정버튼, 1: 목표, 2: 카테고리, 3: 통장, 4: 완료)
-    const [tutorialStep, setTutorialStep] = useState<TutorialStep>(4); // 4 = 완료(비활성)
+    const [tutorialStep, setTutorialStep] = useState<TutorialStep>(5); // 5 = 완료(비활성)
 
     // 처음 가계부 탭 방문 시 튜토리얼 시작
     useEffect(() => {
@@ -48,22 +50,20 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
 
     const handleTutorialNext = useCallback(() => {
         if (tutorialStep === 0) {
-            // 설정 버튼 설명 후 → 설정 메뉴 열고 목표 설명
-            setSettingsMenuVisible(true);
             setTutorialStep(1);
         } else if (tutorialStep === 1) {
             setTutorialStep(2);
         } else if (tutorialStep === 2) {
             setTutorialStep(3);
         } else if (tutorialStep === 3) {
-            // 완료
+            setTutorialStep(4);
+        } else if (tutorialStep === 4) {
             completeTutorial();
         }
     }, [tutorialStep]);
 
     const completeTutorial = useCallback(async () => {
-        setTutorialStep(4);
-        setSettingsMenuVisible(false);
+        setTutorialStep(5);
         await saveBudgetTutorialComplete();
     }, []);
 
@@ -104,12 +104,17 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         store.saveAccountsAndBalances(accs, balances, owners);
     }, [store]);
 
-    const openSettingsItem = useCallback((target: 'goal' | 'category' | 'accountManage') => {
+    const handleSaveFixedExpenses = useCallback((expenses: import('../types/fixedExpense').FixedExpense[]) => {
+        store.saveFixedExpenseSchedules(expenses);
+    }, [store]);
+
+    const openSettingsItem = useCallback((target: 'goal' | 'category' | 'accountManage' | 'fixedExpense') => {
         setSettingsMenuVisible(false);
         setTimeout(() => {
             if (target === 'goal') setGoalModalVisible(true);
             else if (target === 'category') setCategoryModalVisible(true);
             else if (target === 'accountManage') setAccountManageModalVisible(true);
+            else if (target === 'fixedExpense') setFixedExpenseModalVisible(true);
         }, 200);
     }, []);
 
@@ -128,7 +133,7 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         [budgets, accountBalances, accounts, accountOwners, isGroupConnected]
     );
 
-    const isTutorialActive = tutorialStep < 4;
+    const isTutorialActive = tutorialStep < 5;
 
     return (
         <View style={styles.container}>
@@ -203,6 +208,15 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 onSave={handleSaveAccounts}
             />
 
+            <FixedExpenseManageModal
+                visible={fixedExpenseModalVisible}
+                fixedExpenses={store.fixedExpenseSchedules}
+                categories={categories}
+                accounts={accounts}
+                onClose={() => setFixedExpenseModalVisible(false)}
+                onSave={handleSaveFixedExpenses}
+            />
+
             <OverallStatsModal
                 visible={overallStatsVisible}
                 budgets={budgets}
@@ -264,6 +278,15 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                             }}
                         >
                             <Text style={styles.menuItemText}>통장 관리</Text>
+                        </TouchableOpacity>
+                        <View style={styles.menuDivider} />
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => {
+                                if (!isTutorialActive) openSettingsItem('fixedExpense');
+                            }}
+                        >
+                            <Text style={styles.menuItemText}>고정지출 관리</Text>
                         </TouchableOpacity>
                     </View>
                 </TouchableOpacity>
