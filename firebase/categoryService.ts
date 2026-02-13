@@ -72,6 +72,8 @@ export async function subscribeToSharedCategoriesAsync(
     (snapshot) => {
       if (snapshot.exists()) {
         onUpdate(snapshot.data() as SharedCategories);
+      } else {
+        onUpdate({ categories: [], fixedCategories: [], updatedAt: 0 });
       }
     },
     (error) => {

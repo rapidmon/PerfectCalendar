@@ -36,6 +36,7 @@ import {
     fetchMyTodos,
     subscribeToSharedCategoriesAsync,
     saveSharedCategories,
+    getSharedCategories,
     subscribeToGroupAsync,
     SharedBudget,
     SharedTodo,
@@ -346,7 +347,7 @@ export class AppDataStore {
     }
 
     async disconnectGroup(): Promise<void> {
-        // 나가기 전에 그룹 코드와 UID, 현재 통장 데이터를 저장
+        // 나가기 전에 그룹 코드와 UID, 통장 데이터를 저장
         const groupCode = this._groupCode;
         const uid = getCurrentUid();
         const prevAccounts = [...this._accounts];
@@ -378,11 +379,10 @@ export class AppDataStore {
                 this._budgets = myBudgets;
                 this._todos = myTodos;
 
-                // 내 통장만 유지 (소유자 기준 필터링)
-                // 소유자 미지정(undefined) 통장도 내 것으로 간주
+                // 내 소유 통장만 유지 (소유자가 명확히 나인 것만)
                 if (uid) {
                     const myAccounts = prevAccounts.filter(acc =>
-                        !prevOwners[acc] || prevOwners[acc] === uid
+                        prevOwners[acc] === uid
                     );
                     const myBalances: AccountBalances = {};
                     for (const acc of myAccounts) {
@@ -390,12 +390,11 @@ export class AppDataStore {
                             myBalances[acc] = prevBalances[acc];
                         }
                     }
-                    this._accounts = myAccounts;
+                    this._accounts = myAccounts.length > 0 ? myAccounts : ['기본'];
                     this._accountBalances = myBalances;
                 } else {
-                    // uid 없으면 전체 유지 (소유자 구분 불가)
-                    this._accounts = prevAccounts;
-                    this._accountBalances = prevBalances;
+                    this._accounts = ['기본'];
+                    this._accountBalances = {};
                 }
                 this._accountOwners = {};
 
@@ -405,6 +404,8 @@ export class AppDataStore {
                     saveTodos(myTodos),
                     saveAccounts(this._accounts),
                     saveAccountBalances(this._accountBalances),
+                    saveCategories(this._categories),
+                    saveFixedExpenseCategories(this._fixedCategories),
                 ]);
             } catch (error) {
                 console.error('내 데이터 가져오기 실패:', error);
@@ -583,7 +584,11 @@ export class AppDataStore {
         this.debouncedSave('categories', () => saveCategories(this._categories));
 
         if (this._isGroupConnected) {
-            saveSharedCategories(this._categories, this._fixedCategories).catch(console.error);
+            getSharedCategories().then(shared => {
+                const mergedCats = [...new Set([...(shared?.categories || []), ...this._categories])];
+                const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...this._fixedCategories])];
+                saveSharedCategories(mergedCats, mergedFixed).catch(console.error);
+            }).catch(console.error);
         }
     }
 
@@ -595,7 +600,11 @@ export class AppDataStore {
         this.debouncedSave('fixedCategories', () => saveFixedExpenseCategories(this._fixedCategories));
 
         if (this._isGroupConnected) {
-            saveSharedCategories(cats, fixed).catch(console.error);
+            getSharedCategories().then(shared => {
+                const mergedCats = [...new Set([...(shared?.categories || []), ...cats])];
+                const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...fixed])];
+                saveSharedCategories(mergedCats, mergedFixed).catch(console.error);
+            }).catch(console.error);
         }
     }
 
