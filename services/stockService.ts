@@ -207,12 +207,17 @@ export const searchStocks = async (
 
     const results: StockSearchResult[] = [];
 
-    if (market === 'KOREA' || market === 'ALL') {
+    if (market === 'ALL') {
+        // 전체 검색: 한국/미국 병렬 호출
+        const [koreaResults, usResults] = await Promise.all([
+            searchKoreaStocks(query),
+            searchUSStocks(query),
+        ]);
+        results.push(...koreaResults, ...usResults);
+    } else if (market === 'KOREA') {
         const koreaResults = await searchKoreaStocks(query);
         results.push(...koreaResults);
-    }
-
-    if (market === 'US' || market === 'ALL') {
+    } else {
         const usResults = await searchUSStocks(query);
         results.push(...usResults);
     }
