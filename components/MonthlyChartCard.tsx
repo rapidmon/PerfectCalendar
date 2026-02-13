@@ -7,7 +7,7 @@ interface MonthlyChartCardProps {
     chartData: ChartMonthData[];
 }
 
-export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
+function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
     if (chartData.length === 0) {
         return (
             <View style={styles.card}>
@@ -270,12 +270,16 @@ export default function MonthlyChartCard({ chartData }: MonthlyChartCardProps) {
                     showsHorizontalScrollIndicator={false}
                     javaScriptEnabled={true}
                     originWhitelist={['*']}
+                    cacheEnabled={true}
+                    cacheMode="LOAD_CACHE_ELSE_NETWORK"
                     injectedJavaScript="setTimeout(() => { window.scrollTo(document.body.scrollWidth, 0); }, 300);"
                 />
             </View>
         </View>
     );
 }
+
+export default React.memo(MonthlyChartCard);
 
 const styles = StyleSheet.create({
     card: {

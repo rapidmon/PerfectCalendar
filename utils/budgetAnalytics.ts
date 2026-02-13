@@ -57,21 +57,17 @@ export function computeMonthlyStats(
         }
     }
 
+    // 총 지출에서 저축 제외
+    totalExpense -= totalSavings;
+
     const categoryBreakdown = Object.entries(categoryMap)
+        .filter(([category]) => category !== '저축')
         .map(([category, amount]) => ({
             category,
             amount,
             ratio: totalExpense > 0 ? (amount / totalExpense) * 100 : 0,
         }))
         .sort((a, b) => b.amount - a.amount);
-
-    // 총 지출에서 저축 제외
-    totalExpense -= totalSavings;
-
-    const categoryBreakdownExcludingSavings = categoryBreakdown.map(item => ({
-        ...item,
-        ratio: totalExpense > 0 ? (item.amount / totalExpense) * 100 : 0,
-    })).filter(item => item.category !== '저축');
 
     const incomeExpenseRatio = totalIncome > 0 ? (totalExpense / totalIncome) * 100 : 0;
 
@@ -81,7 +77,7 @@ export function computeMonthlyStats(
         totalSavings,
         totalFixedExpense,
         incomeExpenseRatio,
-        categoryBreakdown: categoryBreakdownExcludingSavings,
+        categoryBreakdown,
     };
 }
 
@@ -142,23 +138,20 @@ export function computeAccountBalances(
 ): { name: string; balance: number; ownerUid?: string }[] {
     const defaultAccount = accounts[0] || '기본';
 
-    return accounts.map(account => {
-        const initial = initialBalances[account] || 0;
-        let balance = initial;
-
-        for (const b of budgets) {
-            if ((b.account || defaultAccount) !== account) continue;
-            if (b.type === 'INCOME') {
-                balance += Math.abs(b.money);
-            } else {
-                balance -= Math.abs(b.money);
-            }
+    // Single pass: accumulate deltas per account
+    const deltaMap: Record<string, number> = {};
+    for (const b of budgets) {
+        const acct = b.account || defaultAccount;
+        if (b.type === 'INCOME') {
+            deltaMap[acct] = (deltaMap[acct] || 0) + Math.abs(b.money);
+        } else {
+            deltaMap[acct] = (deltaMap[acct] || 0) - Math.abs(b.money);
         }
+    }
 
-        return {
-            name: account,
-            balance,
-            ownerUid: owners?.[account],
-        };
-    });
+    return accounts.map(account => ({
+        name: account,
+        balance: (initialBalances[account] || 0) + (deltaMap[account] || 0),
+        ownerUid: owners?.[account],
+    }));
 }

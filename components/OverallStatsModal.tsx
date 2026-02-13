@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { Budget } from '../types/budget';
 
@@ -9,27 +9,31 @@ interface OverallStatsModalProps {
 }
 
 export default function OverallStatsModal({ visible, budgets, onClose }: OverallStatsModalProps) {
-    let totalIncome = 0;
-    let totalExpense = 0;
-    const categoryMap: Record<string, number> = {};
+    const { totalIncome, totalExpense, categoryBreakdown } = useMemo(() => {
+        let income = 0;
+        let expense = 0;
+        const categoryMap: Record<string, number> = {};
 
-    for (const b of budgets) {
-        if (b.type === 'INCOME') {
-            totalIncome += Math.abs(b.money);
-        } else {
-            const abs = Math.abs(b.money);
-            totalExpense += abs;
-            categoryMap[b.category] = (categoryMap[b.category] || 0) + abs;
+        for (const b of budgets) {
+            if (b.type === 'INCOME') {
+                income += Math.abs(b.money);
+            } else {
+                const abs = Math.abs(b.money);
+                expense += abs;
+                categoryMap[b.category] = (categoryMap[b.category] || 0) + abs;
+            }
         }
-    }
 
-    const categoryBreakdown = Object.entries(categoryMap)
-        .map(([category, amount]) => ({
-            category,
-            amount,
-            ratio: totalExpense > 0 ? (amount / totalExpense) * 100 : 0,
-        }))
-        .sort((a, b) => b.amount - a.amount);
+        const breakdown = Object.entries(categoryMap)
+            .map(([category, amount]) => ({
+                category,
+                amount,
+                ratio: expense > 0 ? (amount / expense) * 100 : 0,
+            }))
+            .sort((a, b) => b.amount - a.amount);
+
+        return { totalIncome: income, totalExpense: expense, categoryBreakdown: breakdown };
+    }, [budgets]);
 
     const formatAmount = (n: number) => n.toLocaleString('ko-KR') + '원';
 
