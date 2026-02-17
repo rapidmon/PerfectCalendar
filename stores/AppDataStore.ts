@@ -199,14 +199,15 @@ export class AppDataStore {
 
         // 누락된 납입 기록을 가계부에 추가
         const newBudgets: Budget[] = missingPayments.map(payment => {
+            const linkedSavings = savingsMap.get(payment.savingsId);
             return {
                 id: `savings_${payment.savingsId}_${payment.paymentMonth}_${Date.now()}`,
                 title: `${payment.bankName} ${payment.savingsName}`,
                 money: payment.monthlyAmount,
                 date: payment.paymentDate,
-                type: 'EXPENSE' as const,
+                type: 'INCOME' as const,
                 category: '저축',
-                account: '',  // 적금 납입은 메인 통장에서 지출 (적금 통장 잔액은 별도 관리)
+                account: linkedSavings?.linkedAccountName || '',
                 savingsId: payment.savingsId,
                 savingsPaymentDate: payment.paymentMonth,
             };
@@ -824,9 +825,9 @@ export class AppDataStore {
             title: `${payment.bankName} ${payment.savingsName}`,
             money: payment.monthlyAmount,
             date: payment.paymentDate,
-            type: 'EXPENSE' as const,
+            type: 'INCOME' as const,
             category: '저축',
-            account: '',  // 적금 납입은 메인 통장에서 지출 (적금 통장 잔액은 별도 관리)
+            account: savings.linkedAccountName || '',
             savingsId: payment.savingsId,
             savingsPaymentDate: payment.paymentMonth,
         }));

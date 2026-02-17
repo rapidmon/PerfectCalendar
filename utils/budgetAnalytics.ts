@@ -41,14 +41,16 @@ export function computeMonthlyStats(
 
     for (const b of monthBudgets) {
         if (b.type === 'INCOME') {
-            totalIncome += Math.abs(b.money);
+            const abs = Math.abs(b.money);
+            if (b.category === '저축') {
+                totalSavings += abs;
+            } else {
+                totalIncome += abs;
+            }
         } else {
             const abs = Math.abs(b.money);
             totalExpense += abs;
 
-            if (b.category === '저축') {
-                totalSavings += abs;
-            }
             if (fixedCategories.includes(b.category)) {
                 totalFixedExpense += abs;
             }
@@ -56,9 +58,6 @@ export function computeMonthlyStats(
             categoryMap[b.category] = (categoryMap[b.category] || 0) + abs;
         }
     }
-
-    // 총 지출에서 저축 제외
-    totalExpense -= totalSavings;
 
     const categoryBreakdown = Object.entries(categoryMap)
         .filter(([category]) => category !== '저축')
