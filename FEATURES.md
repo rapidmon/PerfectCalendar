@@ -46,7 +46,7 @@ App.tsx
 - "다음" 버튼
 
 **페이지 2 — 초기 설정**
-- 통장 관리: 기본값 '기본' 포함, 추가/삭제, 초기 잔액 입력
+- 통장 관리: 기본값 '기본' 포함, 추가/삭제
 - 지출 카테고리 관리: 기본값 '식비', '저축' 포함, 칩 형태
 - "시작하기" 버튼으로 완료
 
@@ -172,7 +172,7 @@ App.tsx
 |------|------|------|
 | 수입 | 초록 | 총 INCOME 합계 |
 | 수입 대비 지출 | — | (총 지출 ÷ 수입) × 100% |
-| 저축 | 파랑 | category='저축' 지출 합계 |
+| 저축 | 파랑 | category='저축' 수입(INCOME) 합계 |
 | 고정지출 | 주황 | 고정 카테고리 지출 합계 |
 | 총 지출 ▼ | 빨강 | 저축 제외 모든 지출 (클릭 시 카테고리별 펼침) |
 | 전년 대비 고정지출 | 증가빨강/감소초록 | YoY 성장률 |
@@ -212,7 +212,6 @@ App.tsx
 
 - 통장 목록 (▲▼ 버튼으로 순서 변경)
 - 통장명 편집 (✎ 클릭)
-- 초기 잔액 입력 (원)
 - 통장 삭제
 - **그룹 모드**: 소유자 변경 (멤버 드롭다운, 색상 도트)
 
@@ -290,8 +289,6 @@ App.tsx
 - 상품명, 은행명 (드롭다운: 국민/신한/우리/하나/NH/카카오/토스/SC/기업/새마을/기타)
 - 금리(%), 시작일, 만기일 (DateTimePicker)
 - 타입별 추가 필드
-- 초기 잔액 (선택)
-
 **연결 통장**: 저장 시 `[은행명] 상품명` 형식으로 자동 생성
 
 ### 7.3 SavingsList
@@ -304,6 +301,8 @@ App.tsx
 
 - 정기적금(`INSTALLMENT_SAVINGS`) 생성 시, 누락된 납입 기록을 가계부(`Budget`)에 자동 생성
 - `savingsId`와 `savingsPaymentDate`로 연결
+- 타입: `INCOME` (적금 연결 통장으로 돈이 들어가는 개념)
+- 통장: 해당 적금의 `linkedAccountName` (예: `[국민] 적금상품명`)
 - 카테고리: '저축'
 
 ### 7.5 이자 계산 로직
@@ -389,7 +388,7 @@ App.tsx
 |------|---------------|-----------|
 | 가계부 | groups/{code}/budgets/ | budgets |
 | 할 일 | groups/{code}/todos/ | todos |
-| 통장 | groups/{code}/settings/accounts | accounts, balances, owners |
+| 통장 | groups/{code}/settings/accounts | accounts, owners |
 | 카테고리 | groups/{code}/settings/categories | categories, fixedCategories |
 | 그룹 정보 | groups/{code} | memberNames, memberColors |
 
@@ -430,7 +429,6 @@ App.tsx
 | `@fixed_expense_categories` | string[] | 고정지출 카테고리 |
 | `@monthly_goals` | { [YYYY-MM]: number } | 월별 목표 |
 | `@accounts` | string[] | 통장 목록 |
-| `@account_balances` | { [name]: number } | 통장별 잔액 |
 | `@investments` | Investment[] | 투자 항목 |
 | `@savings` | Savings[] | 적금/예금 항목 |
 | `@onboarding_complete` | boolean | 온보딩 완료 여부 |
@@ -446,14 +444,14 @@ groups/{groupCode}/
   ├─ budgets/{budgetId} → SharedBudget (money, date, account, category, memo, author, authorName)
   ├─ todos/{todoId} → SharedTodo (title, type, completed, 날짜필드들, author, authorName)
   └─ settings/
-     ├─ accounts → { accounts[], balances{}, owners{} }
+     ├─ accounts → { accounts[], owners{} }
      └─ categories → { categories[], fixedCategories[] }
 ```
 
 ### 9.3 iOS 위젯 동기화
 
 App Group 공유 저장소를 통해 iOS 위젯에 데이터 동기화:
-`widget_todos`, `widget_budgets`, `widget_accounts`, `widget_account_balances`, `widget_fixed_expense_categories`, `widget_monthly_goals`
+`widget_todos`, `widget_budgets`, `widget_accounts`, `widget_fixed_expense_categories`, `widget_monthly_goals`
 
 ---
 
@@ -476,7 +474,7 @@ OOP 패턴의 중앙 데이터 저장소:
 | StoreContext | store, isLoaded | App, 모든 CRUD 컴포넌트 |
 | TodoContext | todos | TodoList, TodoFullList |
 | BudgetContext | budgets, categories, fixedCategories, monthlyGoals | BudgetList, BudgetFullList |
-| AccountContext | accounts, accountBalances, accountOwners | BudgetList, BudgetFullList |
+| AccountContext | accounts, accountOwners | BudgetList, BudgetFullList |
 | GroupContext | isGroupConnected, memberNames, memberColors, groupCode, userName | 그룹 관련 컴포넌트 |
 | InvestmentContext | investments, savings | InvestmentScreen |
 
@@ -496,7 +494,7 @@ OOP 패턴의 중앙 데이터 저장소:
 - `computeMonthlyStats()`: 월간 수입/지출/저축/고정지출/카테고리별 통계
 - `computeYoYGrowthRate()`: 전년 동월 대비 증감률
 - `getMultiMonthChartData()`: 6개월 차트 데이터
-- `computeAccountBalances()`: 통장별 잔액 계산 (초기잔액 + 수입 − 지출)
+- `computeAccountBalances()`: 통장별 잔액 계산 (수입 합계 − 지출 합계)
 
 ### 11.3 적금 계산 (`utils/savingsCalculator.ts`)
 
