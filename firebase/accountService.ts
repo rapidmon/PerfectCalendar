@@ -8,7 +8,6 @@ import {
 } from 'firebase/firestore';
 import { db } from './config';
 import { getCurrentGroupCode, getCurrentUid } from './groupService';
-import { AccountBalances } from '../types/budget';
 
 // 통장 소유자 정보
 export interface AccountOwnership {
@@ -17,7 +16,6 @@ export interface AccountOwnership {
 
 export interface SharedAccounts {
   accounts: string[];
-  balances: AccountBalances;
   owners: AccountOwnership;  // 각 통장의 소유자
   updatedAt: number;
 }
@@ -25,7 +23,6 @@ export interface SharedAccounts {
 // 통장 정보 저장
 export async function saveSharedAccounts(
   accounts: string[],
-  balances: AccountBalances,
   owners?: AccountOwnership
 ): Promise<boolean> {
   const groupCode = await getCurrentGroupCode();
@@ -56,7 +53,6 @@ export async function saveSharedAccounts(
 
     transaction.set(docRef, {
       accounts,
-      balances,
       owners: finalOwners,
       updatedAt: Date.now()
     });
@@ -116,7 +112,6 @@ export async function subscribeToSharedAccountsAsync(
 // 기존 로컬 통장 데이터 업로드 (현재 사용자를 소유자로 설정)
 export async function uploadLocalAccounts(
   accounts: string[],
-  balances: AccountBalances
 ): Promise<boolean> {
   const uid = getCurrentUid();
   if (!uid) return false;
@@ -127,13 +122,12 @@ export async function uploadLocalAccounts(
     owners[acc] = uid;
   }
 
-  return await saveSharedAccounts(accounts, balances, owners);
+  return await saveSharedAccounts(accounts, owners);
 }
 
 // 새 통장 추가 시 소유자 설정
 export async function addSharedAccount(
   accountName: string,
-  initialBalance: number = 0
 ): Promise<boolean> {
   const uid = getCurrentUid();
   const groupCode = await getCurrentGroupCode();
@@ -143,7 +137,6 @@ export async function addSharedAccount(
   // 기존 데이터 가져오기
   const existing = await getSharedAccounts();
   const accounts = existing?.accounts || [];
-  const balances = existing?.balances || {};
   const owners = existing?.owners || {};
 
   // 이미 존재하는 통장인지 확인
@@ -153,8 +146,7 @@ export async function addSharedAccount(
 
   // 새 통장 추가
   accounts.push(accountName);
-  balances[accountName] = initialBalance;
   owners[accountName] = uid;
 
-  return await saveSharedAccounts(accounts, balances, owners);
+  return await saveSharedAccounts(accounts, owners);
 }

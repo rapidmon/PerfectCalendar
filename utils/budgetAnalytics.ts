@@ -1,4 +1,4 @@
-import { Budget, AccountBalances } from '../types/budget';
+import { Budget } from '../types/budget';
 
 export interface MonthlyStats {
     totalIncome: number;
@@ -132,7 +132,6 @@ export function getMultiMonthChartData(
 
 export function computeAccountBalances(
     budgets: Budget[],
-    initialBalances: AccountBalances,
     accounts: string[],
     owners?: { [accountName: string]: string },
 ): { name: string; balance: number; ownerUid?: string }[] {
@@ -151,7 +150,7 @@ export function computeAccountBalances(
 
     return accounts.map(account => ({
         name: account,
-        balance: (initialBalances[account] || 0) + (deltaMap[account] || 0),
+        balance: deltaMap[account] || 0,
         ownerUid: owners?.[account],
     }));
 }

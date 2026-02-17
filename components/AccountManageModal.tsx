@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { AccountBalances } from '../types/budget';
 import { AccountOwnership } from '../firebase';
 import { getMemberColor } from '../utils/memberColors';
 
@@ -17,19 +16,17 @@ interface AccountItem {
 interface AccountManageModalProps {
     visible: boolean;
     accounts: string[];
-    initialBalances: AccountBalances;
     accountOwners?: AccountOwnership;
     memberNames?: { [uid: string]: string };
     memberColors?: { [uid: string]: string };
     isGroupConnected?: boolean;
     onClose: () => void;
-    onSave: (accounts: string[], balances: AccountBalances, owners?: AccountOwnership) => void;
+    onSave: (accounts: string[], owners?: AccountOwnership) => void;
 }
 
 export default function AccountManageModal({
     visible,
     accounts,
-    initialBalances,
     accountOwners = {},
     memberNames = {},
     memberColors: customColors,
@@ -38,7 +35,6 @@ export default function AccountManageModal({
     onSave,
 }: AccountManageModalProps) {
     const [list, setList] = useState<AccountItem[]>([]);
-    const [balanceTexts, setBalanceTexts] = useState<Record<string, string>>({});
     const [localOwners, setLocalOwners] = useState<AccountOwnership>({});
     const [newAccount, setNewAccount] = useState('');
     const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -54,19 +50,13 @@ export default function AccountManageModal({
                 name,
             }));
             setList(items);
-            const texts: Record<string, string> = {};
-            for (const account of accounts) {
-                const val = initialBalances[account];
-                texts[account] = val ? String(val) : '';
-            }
-            setBalanceTexts(texts);
             setLocalOwners({ ...accountOwners });
             setNewAccount('');
             setEditingKey(null);
             setEditingName('');
             setOwnerPickerAccount(null);
         }
-    }, [visible, accounts, initialBalances, accountOwners]);
+    }, [visible, accounts, accountOwners]);
 
     const handleAdd = () => {
         const trimmed = newAccount.trim();
@@ -80,17 +70,11 @@ export default function AccountManageModal({
             name: trimmed,
         };
         setList(prev => [...prev, newItem]);
-        setBalanceTexts(prev => ({ ...prev, [trimmed]: '' }));
         setNewAccount('');
     };
 
     const handleDelete = (key: string, name: string) => {
         setList(prev => prev.filter(item => item.key !== key));
-        setBalanceTexts(prev => {
-            const next = { ...prev };
-            delete next[name];
-            return next;
-        });
         setLocalOwners(prev => {
             const next = { ...prev };
             delete next[name];
@@ -141,12 +125,6 @@ export default function AccountManageModal({
             setList(prev => prev.map(i =>
                 i.key === editingKey ? { ...i, name: trimmed } : i
             ));
-            setBalanceTexts(prev => {
-                const next = { ...prev };
-                next[trimmed] = next[oldName] || '';
-                delete next[oldName];
-                return next;
-            });
             // 소유자 정보도 새 이름으로 이전
             setLocalOwners(prev => {
                 const next = { ...prev };
@@ -166,23 +144,9 @@ export default function AccountManageModal({
         setEditingName('');
     };
 
-    const handleBalanceChange = (account: string, text: string) => {
-        setBalanceTexts(prev => ({
-            ...prev,
-            [account]: text.replace(/[^0-9-]/g, ''),
-        }));
-    };
-
     const handleSave = () => {
         const accountNames = list.map(item => item.name);
-        const balances: AccountBalances = {};
-        for (const name of accountNames) {
-            const val = parseInt(balanceTexts[name] || '0', 10);
-            if (!isNaN(val)) {
-                balances[name] = val;
-            }
-        }
-        onSave(accountNames, balances, isGroupConnected ? localOwners : undefined);
+        onSave(accountNames, isGroupConnected ? localOwners : undefined);
         onClose();
     };
 
@@ -259,17 +223,6 @@ export default function AccountManageModal({
                                 <Text style={styles.ownerChangeText}>변경</Text>
                             </TouchableOpacity>
                         )}
-                        <View style={styles.balanceRow}>
-                            <Text style={styles.balanceLabel}>초기 잔액</Text>
-                            <TextInput
-                                style={styles.balanceInput}
-                                placeholder="0"
-                                value={balanceTexts[item.name] || ''}
-                                onChangeText={(text) => handleBalanceChange(item.name, text)}
-                                keyboardType="numeric"
-                            />
-                            <Text style={styles.unit}>원</Text>
-                        </View>
                     </View>
                     <TouchableOpacity onPress={() => handleDelete(item.key, item.name)} style={styles.deleteBtn}>
                         <Text style={styles.deleteText}>삭제</Text>
@@ -474,29 +427,6 @@ const styles = StyleSheet.create({
     cancelEditText: {
         fontSize: 13,
         color: '#999',
-    },
-    balanceRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    balanceLabel: {
-        fontSize: 12,
-        color: '#888',
-        marginRight: 8,
-    },
-    balanceInput: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 6,
-        padding: 6,
-        fontSize: 14,
-        width: 110,
-        textAlign: 'right',
-    },
-    unit: {
-        fontSize: 13,
-        color: '#666',
-        marginLeft: 4,
     },
     deleteBtn: {
         marginLeft: 12,

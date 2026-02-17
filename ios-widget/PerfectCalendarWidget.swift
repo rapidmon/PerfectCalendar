@@ -67,10 +67,6 @@ struct DataProvider {
         loadJSON("widget_accounts") ?? []
     }
 
-    static func loadAccountBalances() -> [String: Int] {
-        loadJSON("widget_account_balances") ?? [:]
-    }
-
     static func loadMonthlyGoals() -> [String: Int] {
         loadJSON("widget_monthly_goals") ?? [:]
     }
@@ -95,7 +91,6 @@ struct CalendarEntry: TimelineEntry {
     let todos: [TodoItem]
     let budgets: [BudgetItem]
     let accounts: [String]
-    let accountBalances: [String: Int]
     let monthlyGoals: [String: Int]
     let fixedExpenseCategories: [String]
     let activeTab: String
@@ -103,7 +98,7 @@ struct CalendarEntry: TimelineEntry {
 
 struct CalendarTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> CalendarEntry {
-        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], accountBalances: [:], monthlyGoals: [:], fixedExpenseCategories: [], activeTab: "todo")
+        CalendarEntry(date: Date(), todos: [], budgets: [], accounts: [], monthlyGoals: [:], fixedExpenseCategories: [], activeTab: "todo")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (CalendarEntry) -> Void) {
@@ -122,7 +117,6 @@ struct CalendarTimelineProvider: TimelineProvider {
             todos: DataProvider.loadTodos(),
             budgets: DataProvider.loadBudgets(),
             accounts: DataProvider.loadAccounts(),
-            accountBalances: DataProvider.loadAccountBalances(),
             monthlyGoals: DataProvider.loadMonthlyGoals(),
             fixedExpenseCategories: DataProvider.loadFixedExpenseCategories(),
             activeTab: DataProvider.loadActiveTab()
@@ -466,7 +460,6 @@ struct TodoTabContent: View {
 struct BudgetTabContent: View {
     let budgets: [BudgetItem]
     let accounts: [String]
-    let accountBalances: [String: Int]
     let monthlyGoals: [String: Int]
     let fixedExpenseCategories: [String]
 
@@ -478,8 +471,7 @@ struct BudgetTabContent: View {
     var accountEntries: [AccountEntry] {
         let defaultAccount = accounts.first ?? "기본"
         return accounts.map { account in
-            let initial = accountBalances[account] ?? 0
-            var balance = initial
+            var balance = 0
             for b in budgets {
                 let budgetAccount = b.account ?? defaultAccount
                 guard budgetAccount == account else { continue }
@@ -597,7 +589,6 @@ struct CalendarWidgetView: View {
                 BudgetTabContent(
                     budgets: entry.budgets,
                     accounts: entry.accounts,
-                    accountBalances: entry.accountBalances,
                     monthlyGoals: entry.monthlyGoals,
                     fixedExpenseCategories: entry.fixedExpenseCategories
                 )

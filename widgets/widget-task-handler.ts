@@ -2,7 +2,7 @@ import React from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linking } from 'react-native';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
-import { loadTodos, loadBudgets, saveTodos, loadAccounts, loadAccountBalances, loadMonthlyGoals, loadFixedExpenseCategories } from '../utils/storage';
+import { loadTodos, loadBudgets, saveTodos, loadAccounts, loadMonthlyGoals, loadFixedExpenseCategories } from '../utils/storage';
 import CombinedWidgetScreen, { WidgetTab } from './CombinedWidgetScreen';
 
 const WIDGET_TAB_KEY = '@widget_active_tab';
@@ -23,12 +23,11 @@ async function setActiveTab(tab: WidgetTab): Promise<void> {
 }
 
 async function buildCombinedWidget(tab?: WidgetTab) {
-    const [todos, budgets, savedTab, accounts, accountBalances, monthlyGoals, fixedExpenseCategories] = await Promise.all([
+    const [todos, budgets, savedTab, accounts, monthlyGoals, fixedExpenseCategories] = await Promise.all([
         loadTodos(),
         loadBudgets(),
         tab ? Promise.resolve(tab) : getActiveTab(),
         loadAccounts(),
-        loadAccountBalances(),
         loadMonthlyGoals(),
         loadFixedExpenseCategories(),
     ]);
@@ -38,7 +37,6 @@ async function buildCombinedWidget(tab?: WidgetTab) {
         budgets,
         activeTab,
         accounts,
-        accountInitialBalances: accountBalances,
         monthlyGoals,
         fixedExpenseCategories,
     });

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { AppDataStore } from '../stores/AppDataStore';
 import { Todo } from '../types/todo';
-import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
+import { Budget, MonthlyGoal } from '../types/budget';
 import { Investment } from '../types/investment';
 import { Savings } from '../types/savings';
 import { AccountOwnership } from '../firebase';
@@ -26,7 +26,6 @@ interface BudgetData {
 
 interface AccountData {
     accounts: string[];
-    accountBalances: AccountBalances;
     accountOwners: AccountOwnership;
 }
 
@@ -98,10 +97,9 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     const accountValue = useMemo<AccountData>(
         () => ({
             accounts: store.accounts,
-            accountBalances: store.accountBalances,
             accountOwners: store.accountOwners,
         }),
-        [store.accounts, store.accountBalances, store.accountOwners]
+        [store.accounts, store.accountOwners]
     );
 
     const groupValue = useMemo<GroupData>(

@@ -1,5 +1,5 @@
 import { Todo } from '../types/todo';
-import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
+import { Budget, MonthlyGoal } from '../types/budget';
 import { Investment } from '../types/investment';
 import { Savings } from '../types/savings';
 import { FixedExpense } from '../types/fixedExpense';
@@ -10,13 +10,12 @@ import {
     loadFixedExpenseCategories, saveFixedExpenseCategories,
     loadMonthlyGoals, saveMonthlyGoals,
     loadAccounts, saveAccounts,
-    loadAccountBalances, saveAccountBalances,
     savePreGroupAccounts, loadPreGroupAccounts, clearPreGroupAccounts,
     loadInvestments, saveInvestments,
     loadSavings, saveSavings,
     loadFixedExpenses, saveFixedExpenses as saveFixedExpensesToStorage,
 } from '../utils/storage';
-import { getMissingSavingsPayments, getCurrentPaidAmount } from '../utils/savingsCalculator';
+import { getMissingSavingsPayments } from '../utils/savingsCalculator';
 import {
     isGroupConnected,
     getCurrentGroupCode,
@@ -87,7 +86,6 @@ export class AppDataStore {
     private _accounts: string[] = [];
     private _fixedCategories: string[] = [];
     private _monthlyGoals: MonthlyGoal = {};
-    private _accountBalances: AccountBalances = {};
     private _accountOwners: AccountOwnership = {};  // 통장 소유자 정보
     private _investments: Investment[] = [];
     private _savings: Savings[] = [];
@@ -121,7 +119,6 @@ export class AppDataStore {
     get accounts(): string[] { return this._accounts; }
     get fixedCategories(): string[] { return this._fixedCategories; }
     get monthlyGoals(): MonthlyGoal { return this._monthlyGoals; }
-    get accountBalances(): AccountBalances { return this._accountBalances; }
     get accountOwners(): AccountOwnership { return this._accountOwners; }
     get investments(): Investment[] { return this._investments; }
     get savings(): Savings[] { return this._savings; }
@@ -155,7 +152,7 @@ export class AppDataStore {
 
     // ── Initial Data Load ──────────────────────────────────────
     async loadAll(): Promise<void> {
-        const [todos, budgets, categories, fixedCategories, monthlyGoals, accounts, accountBalances, investments, savings, fixedExpenseSchedules] =
+        const [todos, budgets, categories, fixedCategories, monthlyGoals, accounts, investments, savings, fixedExpenseSchedules] =
             await Promise.all([
                 loadTodos(),
                 loadBudgets(),
@@ -163,7 +160,6 @@ export class AppDataStore {
                 loadFixedExpenseCategories(),
                 loadMonthlyGoals(),
                 loadAccounts(),
-                loadAccountBalances(),
                 loadInvestments(),
                 loadSavings(),
                 loadFixedExpenses(),
@@ -175,7 +171,6 @@ export class AppDataStore {
         this._fixedCategories = fixedCategories;
         this._monthlyGoals = monthlyGoals;
         this._accounts = accounts;
-        this._accountBalances = accountBalances;
         this._investments = investments;
         this._savings = savings;
         this._fixedExpenseSchedules = fixedExpenseSchedules;
@@ -256,7 +251,7 @@ export class AppDataStore {
             this._userName = userName;
 
             // 그룹 연결 전 로컬 통장 백업 (나갈 때 복원용)
-            await savePreGroupAccounts(this._accounts, this._accountBalances);
+            await savePreGroupAccounts(this._accounts);
 
             // 기존 구독 해제
             this.stopGroupSync();
@@ -280,7 +275,6 @@ export class AppDataStore {
                 subscribeToSharedAccountsAsync(
                     (sharedAccounts: SharedAccounts) => {
                         this._accounts = sharedAccounts.accounts || [];
-                        this._accountBalances = sharedAccounts.balances || {};
                         this._accountOwners = sharedAccounts.owners || {};
 
                         // 소유자 없는 통장 보정: 현재 사용자로 할당 (무한 루프 방지)
@@ -292,7 +286,7 @@ export class AppDataStore {
                                     this._accountOwners[acc] = uid;
                                 }
                                 this._fixingOrphans = true;
-                                saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners)
+                                saveSharedAccounts(this._accounts, this._accountOwners)
                                     .catch(console.error)
                                     .finally(() => { this._fixingOrphans = false; });
                             }
@@ -383,7 +377,6 @@ export class AppDataStore {
         const groupCode = this._groupCode;
         const uid = getCurrentUid();
         const prevAccounts = [...this._accounts];
-        const prevBalances = { ...this._accountBalances };
         const prevOwners = { ...this._accountOwners };
         const prevAllBudgets = [...this._budgets]; // 그룹 전체 가계부 (구독 해제 전 캡처)
 
@@ -431,17 +424,13 @@ export class AppDataStore {
 
                         // 내 통장 제거
                         const remainingAccounts = prevAccounts.filter(acc => !myAccountNames.has(acc));
-                        const remainingBalances: AccountBalances = {};
                         const remainingOwners: AccountOwnership = {};
                         for (const acc of remainingAccounts) {
-                            if (prevBalances[acc] !== undefined) {
-                                remainingBalances[acc] = prevBalances[acc];
-                            }
                             if (prevOwners[acc]) {
                                 remainingOwners[acc] = prevOwners[acc];
                             }
                         }
-                        await saveSharedAccounts(remainingAccounts, remainingBalances, remainingOwners).catch(console.error);
+                        await saveSharedAccounts(remainingAccounts, remainingOwners).catch(console.error);
                     }
                 }
 
@@ -450,25 +439,16 @@ export class AppDataStore {
                     const myAccounts = prevAccounts.filter(acc =>
                         prevOwners[acc] === uid
                     );
-                    const myBalances: AccountBalances = {};
-                    for (const acc of myAccounts) {
-                        if (prevBalances[acc] !== undefined) {
-                            myBalances[acc] = prevBalances[acc];
-                        }
-                    }
 
                     if (myAccounts.length > 0) {
                         this._accounts = myAccounts;
-                        this._accountBalances = myBalances;
                     } else {
                         // 소유권 정보가 없으면 그룹 연결 전 백업에서 복원
                         const backup = await loadPreGroupAccounts();
                         if (backup && backup.accounts.length > 0) {
                             this._accounts = backup.accounts;
-                            this._accountBalances = backup.balances;
                         } else {
                             this._accounts = ['기본'];
-                            this._accountBalances = {};
                         }
                     }
                 } else {
@@ -476,10 +456,8 @@ export class AppDataStore {
                     const backup = await loadPreGroupAccounts();
                     if (backup && backup.accounts.length > 0) {
                         this._accounts = backup.accounts;
-                        this._accountBalances = backup.balances;
                     } else {
                         this._accounts = ['기본'];
-                        this._accountBalances = {};
                     }
                 }
                 this._accountOwners = {};
@@ -490,7 +468,6 @@ export class AppDataStore {
                     saveBudgets(myBudgets),
                     saveTodos(myTodos),
                     saveAccounts(this._accounts),
-                    saveAccountBalances(this._accountBalances),
                     saveCategories(this._categories),
                     saveFixedExpenseCategories(this._fixedCategories),
                 ]);
@@ -500,7 +477,6 @@ export class AppDataStore {
                 this._budgets = [];
                 this._todos = [];
                 this._accounts = [];
-                this._accountBalances = {};
                 this._accountOwners = {};
             }
         } else {
@@ -508,7 +484,6 @@ export class AppDataStore {
             this._budgets = [];
             this._todos = [];
             this._accounts = [];
-            this._accountBalances = {};
             this._accountOwners = {};
         }
 
@@ -713,14 +688,14 @@ export class AppDataStore {
             if (uid) {
                 this._accountOwners = { ...this._accountOwners, [account]: uid };
             }
-            saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners).catch(console.error);
+            saveSharedAccounts(this._accounts, this._accountOwners).catch(console.error);
         }
 
         this.notify();
         this.debouncedSave('accounts', () => saveAccounts(this._accounts));
     }
 
-    saveAccountsAndBalances(accs: string[], balances: AccountBalances, owners?: AccountOwnership): void {
+    saveAccountsAndBalances(accs: string[], owners?: AccountOwnership): void {
         // 삭제된 통장에 연결된 적금도 함께 삭제
         const removedAccounts = this._accounts.filter(acc => !accs.includes(acc));
         if (removedAccounts.length > 0) {
@@ -747,7 +722,6 @@ export class AppDataStore {
 
         const prevAccounts = new Set(this._accounts);
         this._accounts = accs;
-        this._accountBalances = balances;
 
         // 소유자 정보: 명시적으로 전달된 경우 사용, 아니면 자동 할당
         const newOwners: AccountOwnership = {};
@@ -768,11 +742,10 @@ export class AppDataStore {
 
         if (this._isGroupConnected) {
             // 그룹 연결 시 Firebase에 저장
-            saveSharedAccounts(accs, balances, this._accountOwners).catch(console.error);
+            saveSharedAccounts(accs, this._accountOwners).catch(console.error);
         }
 
         this.debouncedSave('accounts', () => saveAccounts(this._accounts));
-        this.debouncedSave('accountBalances', () => saveAccountBalances(this._accountBalances));
     }
 
     // ── Monthly Goals ──────────────────────────────────────────
@@ -818,13 +791,6 @@ export class AppDataStore {
         // 연결된 통장 자동 생성
         if (savings.linkedAccountName && !this._accounts.includes(savings.linkedAccountName)) {
             this._accounts = [...this._accounts, savings.linkedAccountName];
-            // 잔액 설정: 현재까지 납입된 금액 계산 (투자탭과 동일 로직)
-            const paidAmount = getCurrentPaidAmount(savings);
-            this._accountBalances = {
-                ...this._accountBalances,
-                [savings.linkedAccountName]: paidAmount,
-            };
-            this.debouncedSave('accountBalances', () => saveAccountBalances(this._accountBalances));
 
             // 그룹 연결 시 현재 사용자를 소유자로 설정
             if (this._isGroupConnected) {
@@ -832,7 +798,7 @@ export class AppDataStore {
                 if (uid) {
                     this._accountOwners = { ...this._accountOwners, [savings.linkedAccountName]: uid };
                 }
-                saveSharedAccounts(this._accounts, this._accountBalances, this._accountOwners).catch(console.error);
+                saveSharedAccounts(this._accounts, this._accountOwners).catch(console.error);
             }
 
             this.debouncedSave('accounts', () => saveAccounts(this._accounts));
@@ -903,15 +869,11 @@ export class AppDataStore {
         if (deleteLinkedAccount && savingsToDelete?.linkedAccountName) {
             const accountName = savingsToDelete.linkedAccountName;
             this._accounts = this._accounts.filter(a => a !== accountName);
-            const newBalances = { ...this._accountBalances };
-            delete newBalances[accountName];
-            this._accountBalances = newBalances;
             this.debouncedSave('accounts', () => saveAccounts(this._accounts));
-            this.debouncedSave('accountBalances', () => saveAccountBalances(this._accountBalances));
 
             // 그룹 연결 시 Firebase에도 저장
             if (this._isGroupConnected) {
-                saveSharedAccounts(this._accounts, this._accountBalances).catch(console.error);
+                saveSharedAccounts(this._accounts, this._accountOwners).catch(console.error);
             }
         }
 

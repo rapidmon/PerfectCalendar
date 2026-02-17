@@ -1,7 +1,7 @@
 import React from 'react';
 import { FlexWidget, TextWidget, ListWidget } from 'react-native-android-widget';
 import { Todo } from '../types/todo';
-import { Budget, AccountBalances, MonthlyGoal } from '../types/budget';
+import { Budget, MonthlyGoal } from '../types/budget';
 import { calculateTodoProgress, BlockColor } from '../utils/todoProgress';
 
 export type WidgetTab = 'todo' | 'budget';
@@ -11,7 +11,6 @@ interface CombinedWidgetScreenProps {
     budgets: Budget[];
     activeTab: WidgetTab;
     accounts: string[];
-    accountInitialBalances: AccountBalances;
     monthlyGoals: MonthlyGoal;
     fixedExpenseCategories: string[];
 }
@@ -225,17 +224,15 @@ function AccountCard({ name, balance }: { name: string; balance: number }) {
     );
 }
 
-function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals, fixedExpenseCategories }: {
+function BudgetContent({ budgets, accounts, monthlyGoals, fixedExpenseCategories }: {
     budgets: Budget[];
     accounts: string[];
-    accountInitialBalances: AccountBalances;
     monthlyGoals: MonthlyGoal;
     fixedExpenseCategories: string[];
 }) {
     // 앱과 동일한 방식으로 통장별 잔액 계산
     const accountEntries = accounts.map(account => {
-        const initial = accountInitialBalances[account] || 0;
-        let balance = initial;
+        let balance = 0;
         for (const b of budgets) {
             if ((b.account || '기본') !== account) continue;
             if (b.type === 'INCOME') {
@@ -343,7 +340,7 @@ function BudgetContent({ budgets, accounts, accountInitialBalances, monthlyGoals
 
 // ── 통합 위젯 ──
 
-export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, accountInitialBalances, monthlyGoals, fixedExpenseCategories }: CombinedWidgetScreenProps) {
+export default function CombinedWidgetScreen({ todos, budgets, activeTab, accounts, monthlyGoals, fixedExpenseCategories }: CombinedWidgetScreenProps) {
     return (
         <FlexWidget
             style={{
@@ -411,7 +408,7 @@ export default function CombinedWidgetScreen({ todos, budgets, activeTab, accoun
             {/* 콘텐츠 */}
             {activeTab === 'todo'
                 ? <TodoContent todos={todos} />
-                : <BudgetContent budgets={budgets} accounts={accounts} accountInitialBalances={accountInitialBalances} monthlyGoals={monthlyGoals} fixedExpenseCategories={fixedExpenseCategories} />
+                : <BudgetContent budgets={budgets} accounts={accounts} monthlyGoals={monthlyGoals} fixedExpenseCategories={fixedExpenseCategories} />
             }
         </FlexWidget>
     );

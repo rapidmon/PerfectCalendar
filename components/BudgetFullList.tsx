@@ -8,7 +8,6 @@ import AccountManageModal from './AccountManageModal';
 import FixedExpenseManageModal from './FixedExpenseManageModal';
 import OverallStatsModal from './OverallStatsModal';
 import BudgetTutorial, { TutorialStep } from './BudgetTutorial';
-import { AccountBalances } from '../types/budget';
 import { AccountOwnership } from '../firebase';
 import { useStore, useBudgets, useAccounts, useGroup } from '../contexts/AppDataContext';
 import { computeMonthlyStats, getMultiMonthChartData, computeAccountBalances } from '../utils/budgetAnalytics';
@@ -21,7 +20,7 @@ interface BudgetFullListProps {
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     const { store } = useStore();
     const { budgets, categories, fixedCategories, monthlyGoals } = useBudgets();
-    const { accounts, accountBalances, accountOwners } = useAccounts();
+    const { accounts, accountOwners } = useAccounts();
     const { memberNames, memberColors, isGroupConnected } = useGroup();
 
     const [viewYear, setViewYear] = useState(selectedDate.getFullYear());
@@ -100,8 +99,8 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         store.saveCategoriesAndFixed(cats, fixed);
     }, [store]);
 
-    const handleSaveAccounts = useCallback((accs: string[], balances: AccountBalances, owners?: AccountOwnership) => {
-        store.saveAccountsAndBalances(accs, balances, owners);
+    const handleSaveAccounts = useCallback((accs: string[], owners?: AccountOwnership) => {
+        store.saveAccountsAndBalances(accs, owners);
     }, [store]);
 
     const handleSaveFixedExpenses = useCallback((expenses: import('../types/fixedExpense').FixedExpense[]) => {
@@ -129,8 +128,8 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     );
 
     const accountBalanceList = useMemo(
-        () => computeAccountBalances(budgets, accountBalances, accounts, isGroupConnected ? accountOwners : undefined),
-        [budgets, accountBalances, accounts, accountOwners, isGroupConnected]
+        () => computeAccountBalances(budgets, accounts, isGroupConnected ? accountOwners : undefined),
+        [budgets, accounts, accountOwners, isGroupConnected]
     );
 
     const isTutorialActive = tutorialStep < 5;
@@ -199,7 +198,6 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
             <AccountManageModal
                 visible={accountManageModalVisible}
                 accounts={accounts}
-                initialBalances={accountBalances}
                 accountOwners={accountOwners}
                 memberNames={memberNames}
                 memberColors={memberColors}

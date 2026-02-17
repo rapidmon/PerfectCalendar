@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { Todo } from '../types/todo';
-import { Budget, MonthlyGoal, AccountBalances } from '../types/budget';
+import { Budget, MonthlyGoal } from '../types/budget';
 import { Investment } from '../types/investment';
 import { Savings } from '../types/savings';
 import { FixedExpense } from '../types/fixedExpense';
@@ -25,7 +25,6 @@ const BUDGET_CATEGORIES_KEY = '@budget_categories';
 const FIXED_EXPENSE_CATEGORIES_KEY = '@fixed_expense_categories';
 const MONTHLY_GOALS_KEY = '@monthly_goals';
 const ACCOUNTS_KEY = '@accounts';
-const ACCOUNT_BALANCES_KEY = '@account_balances';
 const ONBOARDING_COMPLETE_KEY = '@onboarding_complete';
 const BUDGET_TUTORIAL_COMPLETE_KEY = '@budget_tutorial_complete';
 const INVESTMENTS_KEY = '@investments';
@@ -191,31 +190,6 @@ export const loadAccounts = async (): Promise<string[]> => {
     }
 };
 
-// 통장 초기 잔액 저장
-export const saveAccountBalances = async (balances: AccountBalances): Promise<void> => {
-    try {
-        const jsonValue = JSON.stringify(balances);
-        await AsyncStorage.setItem(ACCOUNT_BALANCES_KEY, jsonValue);
-        syncToWidgetStorage('widget_account_balances', jsonValue);
-    } catch (e) {
-        console.error('통장 초기 잔액 저장 실패:', e);
-    }
-};
-
-// 통장 초기 잔액 불러오기
-export const loadAccountBalances = async (): Promise<AccountBalances> => {
-    try {
-        const jsonValue = await AsyncStorage.getItem(ACCOUNT_BALANCES_KEY);
-        if (jsonValue != null) {
-            return JSON.parse(jsonValue);
-        }
-        return {};
-    } catch (e) {
-        console.error('통장 초기 잔액 불러오기 실패:', e);
-        return {};
-    }
-};
-
 // 온보딩 완료 저장
 export const saveOnboardingComplete = async (): Promise<void> => {
     try {
@@ -329,9 +303,9 @@ export const loadFixedExpenses = async (): Promise<FixedExpense[]> => {
 };
 
 // 그룹 연결 전 통장 백업 저장
-export const savePreGroupAccounts = async (accounts: string[], balances: AccountBalances): Promise<void> => {
+export const savePreGroupAccounts = async (accounts: string[]): Promise<void> => {
     try {
-        const jsonValue = JSON.stringify({ accounts, balances });
+        const jsonValue = JSON.stringify({ accounts });
         await AsyncStorage.setItem(PREGROUP_ACCOUNTS_KEY, jsonValue);
     } catch (e) {
         console.error('통장 백업 저장 실패:', e);
@@ -339,7 +313,7 @@ export const savePreGroupAccounts = async (accounts: string[], balances: Account
 };
 
 // 그룹 연결 전 통장 백업 불러오기
-export const loadPreGroupAccounts = async (): Promise<{ accounts: string[]; balances: AccountBalances } | null> => {
+export const loadPreGroupAccounts = async (): Promise<{ accounts: string[] } | null> => {
     try {
         const jsonValue = await AsyncStorage.getItem(PREGROUP_ACCOUNTS_KEY);
         if (jsonValue != null) {

@@ -13,11 +13,9 @@ import {
 } from 'react-native';
 import {
     saveAccounts,
-    saveAccountBalances,
     saveCategories,
     saveOnboardingComplete,
 } from '../utils/storage';
-import { AccountBalances } from '../types/budget';
 
 interface OnboardingScreenProps {
     onComplete: () => void;
@@ -39,7 +37,6 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
     // 페이지 2 상태
     const [accounts, setAccounts] = useState<string[]>(['기본']);
     const [newAccount, setNewAccount] = useState('');
-    const [balances, setBalances] = useState<AccountBalances>({ '기본': 0 });
     const [categories, setCategories] = useState<string[]>(['식비', '저축']);
     const [newCategory, setNewCategory] = useState('');
 
@@ -51,22 +48,11 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             return;
         }
         setAccounts(prev => [...prev, trimmed]);
-        setBalances(prev => ({ ...prev, [trimmed]: 0 }));
         setNewAccount('');
     };
 
     const handleDeleteAccount = (acc: string) => {
         setAccounts(prev => prev.filter(a => a !== acc));
-        setBalances(prev => {
-            const next = { ...prev };
-            delete next[acc];
-            return next;
-        });
-    };
-
-    const handleBalanceChange = (acc: string, value: string) => {
-        const num = parseInt(value.replace(/[^0-9]/g, ''), 10) || 0;
-        setBalances(prev => ({ ...prev, [acc]: num }));
     };
 
     const handleAddCategory = () => {
@@ -94,7 +80,6 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
             return;
         }
         await saveAccounts(accounts);
-        await saveAccountBalances(balances);
         await saveCategories(categories);
         await saveOnboardingComplete();
         onComplete();
@@ -179,16 +164,6 @@ export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) 
                             <TouchableOpacity onPress={() => handleDeleteAccount(acc)}>
                                 <Text style={styles.deleteText}>삭제</Text>
                             </TouchableOpacity>
-                        </View>
-                        <View style={styles.balanceRow}>
-                            <TextInput
-                                style={styles.balanceInput}
-                                placeholder="초기 잔액"
-                                keyboardType="numeric"
-                                value={balances[acc] ? String(balances[acc]) : ''}
-                                onChangeText={(v) => handleBalanceChange(acc, v)}
-                            />
-                            <Text style={styles.wonText}>원</Text>
                         </View>
                     </View>
                 ))}

@@ -40,7 +40,7 @@ export default function TogetherScreen() {
   const { store } = useStore();
   const { todos } = useTodos();
   const { budgets, categories, fixedCategories } = useBudgets();
-  const { accounts, accountBalances } = useAccounts();
+  const { accounts } = useAccounts();
   const { memberColors } = useGroup();
   const [mode, setMode] = useState<ScreenMode>('loading');
   const [showJoinInput, setShowJoinInput] = useState(false);
@@ -119,7 +119,7 @@ export default function TogetherScreen() {
 
       // 통장도 항상 업로드 (그룹에 내 통장이 반영되어야 함)
       if (accounts.length > 0) {
-        await uploadLocalAccounts(accounts, accountBalances);
+        await uploadLocalAccounts(accounts);
       }
 
       // 기존 데이터 업로드 (옵션 선택 시)
@@ -215,23 +215,18 @@ export default function TogetherScreen() {
         if (accounts.length > 0) {
           const existingAccounts = await getSharedAccounts();
           const existingList = existingAccounts?.accounts || [];
-          const existingBalances = existingAccounts?.balances || {};
           const existingOwners = existingAccounts?.owners || {};
 
           const mergedAccounts = [...new Set([...existingList, ...accounts])];
-          const mergedBalances = { ...existingBalances };
           const mergedOwners = { ...existingOwners };
 
           const uid = getCurrentUid();
           for (const acc of accounts) {
-            if (!(acc in mergedBalances)) {
-              mergedBalances[acc] = accountBalances[acc] || 0;
-            }
             if (uid && !mergedOwners[acc]) {
               mergedOwners[acc] = uid;
             }
           }
-          await saveSharedAccounts(mergedAccounts, mergedBalances, mergedOwners);
+          await saveSharedAccounts(mergedAccounts, mergedOwners);
         }
 
         // Store에서 그룹 동기화 시작
