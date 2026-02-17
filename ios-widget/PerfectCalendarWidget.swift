@@ -440,17 +440,6 @@ struct TodoTabContent: View {
                 }
             }
 
-            Link(destination: URL(string: "perfectcalendar://")!) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 14))
-                    Text("할 일 추가")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(Color(red: 0.25, green: 0.47, blue: 0.85))
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 6)
-            }
         }
     }
 }
@@ -550,17 +539,6 @@ struct BudgetTabContent: View {
                 }
             }
 
-            Link(destination: URL(string: "perfectcalendar://")!) {
-                HStack {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 14))
-                    Text("항목 추가")
-                        .font(.system(size: 12, weight: .semibold))
-                }
-                .foregroundColor(Color(red: 0.25, green: 0.47, blue: 0.85))
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, 6)
-            }
         }
     }
 }
@@ -595,6 +573,18 @@ struct CalendarWidgetView: View {
             }
 
             Spacer(minLength: 0)
+
+            Link(destination: URL(string: "perfectcalendar://")!) {
+                HStack {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14))
+                    Text(entry.activeTab == "todo" ? "할 일 추가" : "항목 추가")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(Color(red: 0.25, green: 0.47, blue: 0.85))
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 6)
+            }
         }
         .padding(4)
     }
