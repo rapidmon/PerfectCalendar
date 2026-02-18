@@ -135,11 +135,21 @@ export const getNextPaymentDate = (savings: Savings): string | null => {
 
     if (today >= end) return null;
 
-    let nextPayment = new Date(today.getFullYear(), today.getMonth(), paymentDay);
+    // 이번 달 또는 다음 달의 납입일 계산 (날짜 오버플로우 방지)
+    let nextYear = today.getFullYear();
+    let nextMonth = today.getMonth(); // 0-indexed
 
     if (today.getDate() >= paymentDay) {
-        nextPayment.setMonth(nextPayment.getMonth() + 1);
+        nextMonth++;
+        if (nextMonth > 11) {
+            nextMonth = 0;
+            nextYear++;
+        }
     }
+
+    const lastDay = new Date(nextYear, nextMonth + 1, 0).getDate();
+    const actualDay = Math.min(paymentDay, lastDay);
+    const nextPayment = new Date(nextYear, nextMonth, actualDay);
 
     if (nextPayment > end) return null;
 
@@ -181,11 +191,19 @@ export const getMissingSavingsPayments = (
         const startDate = parseDate(s.startDate);
         const endDate = parseDate(s.endDate);
 
-        // 시작월부터 현재월까지 순회
-        let checkDate = new Date(startDate.getFullYear(), startDate.getMonth(), paymentDay);
+        // 시작월부터 현재월까지 순회 (월 단위로 안전하게 이동)
+        let checkYear = startDate.getFullYear();
+        let checkMonth = startDate.getMonth(); // 0-indexed
 
-        while (checkDate <= today && checkDate <= endDate) {
-            const paymentMonth = `${checkDate.getFullYear()}-${String(checkDate.getMonth() + 1).padStart(2, '0')}`;
+        while (true) {
+            // 해당 월의 마지막 날을 고려하여 실제 납입일 계산
+            const lastDayOfMonth = new Date(checkYear, checkMonth + 1, 0).getDate();
+            const actualDay = Math.min(paymentDay, lastDayOfMonth);
+            const checkDate = new Date(checkYear, checkMonth, actualDay);
+
+            if (checkDate > today || checkDate > endDate) break;
+
+            const paymentMonth = `${checkYear}-${String(checkMonth + 1).padStart(2, '0')}`;
             const paymentKey = `${s.id}_${paymentMonth}`;
 
             // 이미 납입 기록이 있는지 확인
@@ -200,8 +218,12 @@ export const getMissingSavingsPayments = (
                 });
             }
 
-            // 다음 달로 이동
-            checkDate.setMonth(checkDate.getMonth() + 1);
+            // 다음 달로 이동 (날짜 오버플로우 없이 년/월만 증가)
+            checkMonth++;
+            if (checkMonth > 11) {
+                checkMonth = 0;
+                checkYear++;
+            }
         }
     }
 
