@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
+import { AppState } from 'react-native';
 import { AppDataStore } from '../stores/AppDataStore';
 import { Todo } from '../types/todo';
 import { Budget, MonthlyGoal } from '../types/budget';
@@ -72,6 +73,16 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = store.subscribe(() => setRevision(r => r + 1));
         store.loadAll();
         return unsubscribe;
+    }, [store]);
+
+    // 앱이 백그라운드로 전환될 때 대기 중인 저장을 즉시 실행
+    useEffect(() => {
+        const sub = AppState.addEventListener('change', (state) => {
+            if (state === 'background' || state === 'inactive') {
+                store.flushPendingSaves();
+            }
+        });
+        return () => sub.remove();
     }, [store]);
 
     const storeValue = useMemo<StoreData>(

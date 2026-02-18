@@ -256,15 +256,24 @@ export default function TogetherScreen() {
           text: '나가기',
           style: 'destructive',
           onPress: async () => {
-            groupUnsubscribeRef.current?.();
-            groupUnsubscribeRef.current = null;
-            // disconnectGroup 먼저 (구독 해제 + 내 데이터 보존)
-            // leaveGroup은 그 후 (Firebase에서 멤버 제거)
-            await store.disconnectGroup();
-            await leaveGroup();
-            setGroupCode('');
-            setGroupInfo(null);
-            setMode('not_connected');
+            try {
+              groupUnsubscribeRef.current?.();
+              groupUnsubscribeRef.current = null;
+              // disconnectGroup 먼저 (구독 해제 + 내 데이터 보존)
+              await store.disconnectGroup();
+              // leaveGroup은 그 후 (Firebase에서 멤버 제거)
+              try {
+                await leaveGroup();
+              } catch (e) {
+                console.error('Firebase 멤버 제거 실패 (재시도 필요):', e);
+              }
+              setGroupCode('');
+              setGroupInfo(null);
+              setMode('not_connected');
+            } catch (error) {
+              console.error('그룹 나가기 실패:', error);
+              Alert.alert('오류', '그룹 나가기에 실패했습니다. 다시 시도해주세요.');
+            }
           }
         }
       ]
