@@ -352,55 +352,80 @@ export default function CombinedWidgetScreen({ todos, budgets, activeTab, accoun
                 height: 'match_parent',
             }}
         >
-            {/* 탭 바 */}
+            {/* 탭 바 + 새로고침 */}
             <FlexWidget
                 style={{
                     flexDirection: 'row',
                     width: 'match_parent',
                     marginBottom: 10,
-                    backgroundColor: '#E8E8E8',
-                    borderRadius: 10,
-                    padding: 3,
+                    alignItems: 'center',
                 }}
             >
                 <FlexWidget
-                    clickAction="SWITCH_TAB"
-                    clickActionData={{ tab: 'todo' }}
                     style={{
                         flex: 1,
-                        alignItems: 'center',
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                        backgroundColor: activeTab === 'todo' ? '#FFFFFF' : '#E8E8E8',
+                        flexDirection: 'row',
+                        backgroundColor: '#E8E8E8',
+                        borderRadius: 10,
+                        padding: 3,
                     }}
                 >
-                    <TextWidget
-                        text="✅ 할 일"
+                    <FlexWidget
+                        clickAction="SWITCH_TAB"
+                        clickActionData={{ tab: 'todo' }}
                         style={{
-                            fontSize: 13,
-                            fontWeight: activeTab === 'todo' ? 'bold' : 'normal',
-                            color: activeTab === 'todo' ? '#333333' : '#999999',
+                            flex: 1,
+                            alignItems: 'center',
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            backgroundColor: activeTab === 'todo' ? '#FFFFFF' : '#E8E8E8',
                         }}
-                    />
+                    >
+                        <TextWidget
+                            text="✅ 할 일"
+                            style={{
+                                fontSize: 13,
+                                fontWeight: activeTab === 'todo' ? 'bold' : 'normal',
+                                color: activeTab === 'todo' ? '#333333' : '#999999',
+                            }}
+                        />
+                    </FlexWidget>
+                    <FlexWidget
+                        clickAction="SWITCH_TAB"
+                        clickActionData={{ tab: 'budget' }}
+                        style={{
+                            flex: 1,
+                            alignItems: 'center',
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            backgroundColor: activeTab === 'budget' ? '#FFFFFF' : '#E8E8E8',
+                        }}
+                    >
+                        <TextWidget
+                            text="💰 가계부"
+                            style={{
+                                fontSize: 13,
+                                fontWeight: activeTab === 'budget' ? 'bold' : 'normal',
+                                color: activeTab === 'budget' ? '#333333' : '#999999',
+                            }}
+                        />
+                    </FlexWidget>
                 </FlexWidget>
                 <FlexWidget
-                    clickAction="SWITCH_TAB"
-                    clickActionData={{ tab: 'budget' }}
+                    clickAction="REFRESH"
                     style={{
-                        flex: 1,
-                        alignItems: 'center',
+                        marginLeft: 8,
+                        backgroundColor: '#E8E8E8',
+                        borderRadius: 10,
                         paddingVertical: 6,
-                        borderRadius: 8,
-                        backgroundColor: activeTab === 'budget' ? '#FFFFFF' : '#E8E8E8',
+                        paddingHorizontal: 10,
+                        alignItems: 'center',
+                        justifyContent: 'center',
                     }}
                 >
                     <TextWidget
-                        text="💰 가계부"
-                        style={{
-                            fontSize: 13,
-                            fontWeight: activeTab === 'budget' ? 'bold' : 'normal',
-                            color: activeTab === 'budget' ? '#333333' : '#999999',
-                        }}
+                        text="🔄"
+                        style={{ fontSize: 14 }}
                     />
                 </FlexWidget>
             </FlexWidget>

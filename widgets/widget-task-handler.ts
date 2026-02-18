@@ -74,6 +74,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
                 await saveTodos(updated);
                 const widget = await buildCombinedWidget('todo');
                 renderWidget(widget);
+            } else if (clickAction === 'REFRESH') {
+                const widget = await buildCombinedWidget();
+                renderWidget(widget);
             } else if (clickAction === 'OPEN_APP' || clickAction === 'ADD_BUDGET') {
                 Linking.openURL('perfectcalendar://');
                 const widget = await buildCombinedWidget();
