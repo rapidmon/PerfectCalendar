@@ -147,11 +147,7 @@ export default function TodoList({ selectedDate }: TodoListProps) {
             }
 
             if (todo.type === 'MONTHLY_RECURRING' && todo.monthlyRecurringDay) {
-                const day = todo.monthlyRecurringDay;
-                const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0).getDate();
-                // 설정된 날이 해당 월의 마지막 날보다 크면 마지막 날에 표시
-                // 예: 31일 반복 → 2월 28일에 표시, 4월 30일에 표시
-                return selectedDate.getDate() === Math.min(day, lastDayOfMonth);
+                return selectedDate.getDate() === todo.monthlyRecurringDay;
             }
 
             if (todo.type === 'DEADLINE' && todo.deadline) {

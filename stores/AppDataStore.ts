@@ -106,7 +106,6 @@ export class AppDataStore {
     private _fixedExpenseUnsubscribe: Unsubscribe | null = null;
     private _syncInProgress = false;
     private _fixingOrphans = false;
-    private _recentlyDeletedAccounts = new Set<string>();
 
     private _saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private _listeners = new Set<Listener>();
@@ -142,32 +141,13 @@ export class AppDataStore {
     }
 
     // ── Debounced Persistence ──────────────────────────────────
-    private _pendingSaves = new Map<string, () => Promise<void>>();
-
     private debouncedSave(key: string, saveFn: () => Promise<void>): void {
         const existing = this._saveTimers.get(key);
         if (existing !== undefined) clearTimeout(existing);
-        this._pendingSaves.set(key, saveFn);
         this._saveTimers.set(key, setTimeout(() => {
-            const fn = this._pendingSaves.get(key);
+            saveFn();
             this._saveTimers.delete(key);
-            this._pendingSaves.delete(key);
-            if (fn) fn().catch(console.error);
         }, AppDataStore.DEBOUNCE_MS));
-    }
-
-    /** 앱 백그라운드/종료 전 호출 — 대기 중인 저장을 즉시 실행 */
-    async flushPendingSaves(): Promise<void> {
-        const promises: Promise<void>[] = [];
-        for (const [key, timer] of this._saveTimers) {
-            clearTimeout(timer);
-            this._saveTimers.delete(key);
-        }
-        for (const [key, fn] of this._pendingSaves) {
-            this._pendingSaves.delete(key);
-            promises.push(fn().catch(console.error) as Promise<void>);
-        }
-        await Promise.all(promises);
     }
 
     // ── Initial Data Load ──────────────────────────────────────
@@ -295,10 +275,7 @@ export class AppDataStore {
                 ),
                 subscribeToSharedAccountsAsync(
                     (sharedAccounts: SharedAccounts) => {
-                        // 최근 로컬에서 삭제된 통장은 Firebase 스냅샷에서 제외
-                        const incomingAccounts = (sharedAccounts.accounts || [])
-                            .filter(acc => !this._recentlyDeletedAccounts.has(acc));
-                        this._accounts = incomingAccounts;
+                        this._accounts = sharedAccounts.accounts || [];
                         this._accountOwners = sharedAccounts.owners || {};
 
                         // 소유자 없는 통장 보정: 현재 사용자로 할당 (무한 루프 방지)
@@ -404,12 +381,6 @@ export class AppDataStore {
         const prevOwners = { ...this._accountOwners };
         const prevAllBudgets = [...this._budgets]; // 그룹 전체 가계부 (구독 해제 전 캡처)
 
-        // 에러 복구용: 현재 데이터를 백업 (구독 해제 전 그룹 데이터)
-        const fallbackBudgets = [...this._budgets];
-        const fallbackTodos = [...this._todos];
-        const fallbackCategories = [...this._categories];
-        const fallbackFixedCategories = [...this._fixedCategories];
-
         // 구독 먼저 해제 (Firebase 변경 감지로 데이터 덮어쓰기 방지)
         this.stopGroupSync();
         this._isGroupConnected = false;
@@ -427,28 +398,17 @@ export class AppDataStore {
                     fetchMyTodos(groupCode),
                 ]);
 
-                // 빈 배열 반환 시: Firebase 에러로 빈 배열이면 fallback 사용
-                // (fetchMyBudgets/fetchMyTodos는 에러 시 []를 반환하므로 구별이 어려움)
-                // uid가 있는데 둘 다 비어있으면 fallback에서 내 데이터 추출
-                const myBudgets: Budget[] = mySharedBudgets.length > 0
-                    ? mySharedBudgets.map(sb => this.sharedBudgetToLocal(sb))
-                    : (uid ? fallbackBudgets.filter(b => b.authorUid === uid) : []);
+                // SharedBudget → Budget 변환
+                const myBudgets: Budget[] = mySharedBudgets.map(sb => this.sharedBudgetToLocal(sb));
 
-                const myTodos: Todo[] = mySharedTodos.length > 0
-                    ? mySharedTodos.map(st => this.sharedTodoToLocal(st))
-                    : (uid ? fallbackTodos.filter(t => t.authorUid === uid) : []);
+                // SharedTodo → Todo 변환
+                const myTodos: Todo[] = mySharedTodos.map(st => this.sharedTodoToLocal(st));
 
                 this._budgets = myBudgets;
                 this._todos = myTodos;
 
-                // 그룹 공유 데이터에서 내 할 일 일괄 삭제 (결과 대기)
-                try {
-                    if (mySharedTodos.length > 0) {
-                        await deleteSharedTodosBatch(mySharedTodos.map(t => t.id));
-                    }
-                } catch (e) {
-                    console.error('그룹에서 할 일 삭제 실패:', e);
-                }
+                // 그룹 공유 데이터에서 내 할 일 일괄 삭제
+                deleteSharedTodosBatch(mySharedTodos.map(t => t.id)).catch(console.error);
 
                 // 그룹 공유 데이터에서 내 통장 + 연결된 가계부 항목 제거
                 if (uid) {
@@ -461,13 +421,7 @@ export class AppDataStore {
                         const linkedBudgetIds = prevAllBudgets
                             .filter(b => b.account && myAccountNames.has(b.account))
                             .map(b => b.id);
-                        try {
-                            if (linkedBudgetIds.length > 0) {
-                                await deleteSharedBudgetsBatch(linkedBudgetIds);
-                            }
-                        } catch (e) {
-                            console.error('그룹에서 가계부 삭제 실패:', e);
-                        }
+                        deleteSharedBudgetsBatch(linkedBudgetIds).catch(console.error);
 
                         // 내 통장 제거
                         const remainingAccounts = prevAccounts.filter(acc => !myAccountNames.has(acc));
@@ -477,11 +431,7 @@ export class AppDataStore {
                                 remainingOwners[acc] = prevOwners[acc];
                             }
                         }
-                        try {
-                            await saveSharedAccounts(remainingAccounts, remainingOwners);
-                        } catch (e) {
-                            console.error('그룹 통장 정리 실패:', e);
-                        }
+                        await saveSharedAccounts(remainingAccounts, remainingOwners).catch(console.error);
                     }
                 }
 
@@ -516,53 +466,25 @@ export class AppDataStore {
 
                 // 로컬에도 저장
                 await Promise.all([
-                    saveBudgets(this._budgets),
-                    saveTodos(this._todos),
+                    saveBudgets(myBudgets),
+                    saveTodos(myTodos),
                     saveAccounts(this._accounts),
                     saveCategories(this._categories),
                     saveFixedExpenseCategories(this._fixedCategories),
                 ]);
             } catch (error) {
-                console.error('그룹 해제 중 오류 발생:', error);
-                // 실패 시 기존 그룹 데이터에서 내 데이터를 최대한 보존
-                if (uid) {
-                    this._budgets = fallbackBudgets.filter(b => b.authorUid === uid);
-                    this._todos = fallbackTodos.filter(t => t.authorUid === uid);
-                } else {
-                    this._budgets = fallbackBudgets;
-                    this._todos = fallbackTodos;
-                }
-                this._categories = fallbackCategories;
-                this._fixedCategories = fallbackFixedCategories;
-
-                // 통장은 백업에서 복원 시도
-                const backup = await loadPreGroupAccounts().catch(() => null);
-                if (backup && backup.accounts.length > 0) {
-                    this._accounts = backup.accounts;
-                } else {
-                    this._accounts = ['기본'];
-                }
+                console.error('내 데이터 가져오기 실패:', error);
+                // 실패 시 빈 배열로 초기화
+                this._budgets = [];
+                this._todos = [];
+                this._accounts = [];
                 this._accountOwners = {};
-
-                // fallback 데이터라도 로컬에 저장
-                await Promise.all([
-                    saveBudgets(this._budgets),
-                    saveTodos(this._todos),
-                    saveAccounts(this._accounts),
-                    saveCategories(this._categories),
-                    saveFixedExpenseCategories(this._fixedCategories),
-                ]).catch(console.error);
             }
         } else {
-            // 그룹 코드 없으면 백업에서 복원 시도
-            const backup = await loadPreGroupAccounts().catch(() => null);
-            if (backup && backup.accounts.length > 0) {
-                this._accounts = backup.accounts;
-            } else {
-                this._accounts = ['기본'];
-            }
+            // 그룹 코드 없으면 빈 배열
             this._budgets = [];
             this._todos = [];
+            this._accounts = [];
             this._accountOwners = {};
         }
 
@@ -638,13 +560,12 @@ export class AppDataStore {
 
     // ── Todo CRUD ──────────────────────────────────────────────
     addTodo(todo: Todo): void {
-        // 로컬 즉시 반영 (낙관적 업데이트)
-        this._todos = [...this._todos, todo];
-        this.notify();
-
         if (this._isGroupConnected) {
+            // Firebase에 추가 (실시간 구독이 로컬 상태 업데이트)
             addSharedTodo(this.localTodoToShared(todo)).catch(console.error);
         } else {
+            this._todos = [...this._todos, todo];
+            this.notify();
             this.debouncedSave('todos', () => saveTodos(this._todos));
         }
     }
@@ -655,25 +576,21 @@ export class AppDataStore {
 
         const updatedTodo = updater(existingTodo);
 
-        // 로컬 즉시 반영
-        this._todos = this._todos.map(t => t.id === id ? updatedTodo : t);
-        this.notify();
-
         if (this._isGroupConnected) {
             updateSharedTodo(id, this.localTodoToShared(updatedTodo)).catch(console.error);
         } else {
+            this._todos = this._todos.map(t => t.id === id ? updatedTodo : t);
+            this.notify();
             this.debouncedSave('todos', () => saveTodos(this._todos));
         }
     }
 
     deleteTodo(id: string): void {
-        // 로컬 즉시 반영
-        this._todos = this._todos.filter(t => t.id !== id);
-        this.notify();
-
         if (this._isGroupConnected) {
             deleteSharedTodo(id).catch(console.error);
         } else {
+            this._todos = this._todos.filter(t => t.id !== id);
+            this.notify();
             this.debouncedSave('todos', () => saveTodos(this._todos));
         }
     }
@@ -682,57 +599,51 @@ export class AppDataStore {
         const todo = this._todos.find(t => t.id === id);
         if (!todo) return;
 
-        // 로컬 즉시 반영
-        this._todos = this._todos.map(t =>
-            t.id === id ? { ...t, completed: !t.completed } : t
-        );
-        this.notify();
-
         if (this._isGroupConnected) {
             toggleSharedTodoComplete(id, !todo.completed).catch(console.error);
         } else {
+            this._todos = this._todos.map(t =>
+                t.id === id ? { ...t, completed: !t.completed } : t
+            );
+            this.notify();
             this.debouncedSave('todos', () => saveTodos(this._todos));
         }
     }
 
     // ── Budget CRUD ────────────────────────────────────────────
     addBudget(budget: Budget): void {
-        // 로컬 즉시 반영
-        this._budgets = [...this._budgets, budget];
-        this.notify();
-
         if (this._isGroupConnected) {
+            // Firebase에 추가 (실시간 구독이 로컬 상태 업데이트)
             addSharedBudget(this.localBudgetToShared(budget)).catch(console.error);
         } else {
+            this._budgets = [...this._budgets, budget];
+            this.notify();
             this.debouncedSave('budgets', () => saveBudgets(this._budgets));
         }
     }
 
     updateBudget(id: string, updates: Partial<Budget>): void {
-        // 로컬 즉시 반영
-        this._budgets = this._budgets.map(b =>
-            b.id === id ? { ...b, ...updates } : b
-        );
-        this.notify();
-
         if (this._isGroupConnected) {
             const existingBudget = this._budgets.find(b => b.id === id);
             if (existingBudget) {
-                updateSharedBudget(id, this.localBudgetToShared(existingBudget)).catch(console.error);
+                const updatedBudget = { ...existingBudget, ...updates };
+                updateSharedBudget(id, this.localBudgetToShared(updatedBudget)).catch(console.error);
             }
         } else {
+            this._budgets = this._budgets.map(b =>
+                b.id === id ? { ...b, ...updates } : b
+            );
+            this.notify();
             this.debouncedSave('budgets', () => saveBudgets(this._budgets));
         }
     }
 
     deleteBudget(id: string): void {
-        // 로컬 즉시 반영
-        this._budgets = this._budgets.filter(b => b.id !== id);
-        this.notify();
-
         if (this._isGroupConnected) {
             deleteSharedBudget(id).catch(console.error);
         } else {
+            this._budgets = this._budgets.filter(b => b.id !== id);
+            this.notify();
             this.debouncedSave('budgets', () => saveBudgets(this._budgets));
         }
     }
@@ -744,12 +655,9 @@ export class AppDataStore {
         this.debouncedSave('categories', () => saveCategories(this._categories));
 
         if (this._isGroupConnected) {
-            // 호출 시점의 카테고리를 캡처 (리스너가 this._categories를 덮어쓸 수 있으므로)
-            const currentCats = [...this._categories];
-            const currentFixed = [...this._fixedCategories];
             getSharedCategories().then(shared => {
-                const mergedCats = [...new Set([...(shared?.categories || []), ...currentCats])];
-                const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...currentFixed])];
+                const mergedCats = [...new Set([...(shared?.categories || []), ...this._categories])];
+                const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...this._fixedCategories])];
                 saveSharedCategories(mergedCats, mergedFixed).catch(console.error);
             }).catch(console.error);
         }
@@ -763,9 +671,11 @@ export class AppDataStore {
         this.debouncedSave('fixedCategories', () => saveFixedExpenseCategories(this._fixedCategories));
 
         if (this._isGroupConnected) {
-            // 카테고리 관리 모달에서 전체 교체이므로 merge 없이 직접 저장
-            // (merge 시 삭제한 카테고리가 Firebase 이전 데이터로 다시 살아남)
-            saveSharedCategories(cats, fixed).catch(console.error);
+            getSharedCategories().then(shared => {
+                const mergedCats = [...new Set([...(shared?.categories || []), ...cats])];
+                const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...fixed])];
+                saveSharedCategories(mergedCats, mergedFixed).catch(console.error);
+            }).catch(console.error);
         }
     }
 
@@ -803,8 +713,6 @@ export class AppDataStore {
                     const budgetIdsToDelete = this._budgets
                         .filter(b => b.savingsId && idsToDelete.has(b.savingsId))
                         .map(b => b.id);
-                    // 그룹 모드에서도 로컬 _budgets 즉시 업데이트
-                    this._budgets = this._budgets.filter(b => !b.savingsId || !idsToDelete.has(b.savingsId));
                     deleteSharedBudgetsBatch(budgetIdsToDelete).catch(console.error);
                 } else {
                     this._budgets = this._budgets.filter(b => !b.savingsId || !idsToDelete.has(b.savingsId));
@@ -951,8 +859,6 @@ export class AppDataStore {
         if (deleteRelatedBudgets) {
             if (this._isGroupConnected) {
                 const relatedIds = this._budgets.filter(b => b.savingsId === id).map(b => b.id);
-                // 그룹 모드에서도 로컬 _budgets 즉시 업데이트 (Firebase 리스너 대기 없이)
-                this._budgets = this._budgets.filter(b => b.savingsId !== id);
                 deleteSharedBudgetsBatch(relatedIds).catch(console.error);
             } else {
                 this._budgets = this._budgets.filter(b => b.savingsId !== id);
@@ -964,21 +870,11 @@ export class AppDataStore {
         if (deleteLinkedAccount && savingsToDelete?.linkedAccountName) {
             const accountName = savingsToDelete.linkedAccountName;
             this._accounts = this._accounts.filter(a => a !== accountName);
-
-            // 소유자 정보도 정리
-            const newOwners = { ...this._accountOwners };
-            delete newOwners[accountName];
-            this._accountOwners = newOwners;
-
             this.debouncedSave('accounts', () => saveAccounts(this._accounts));
 
             // 그룹 연결 시 Firebase에도 저장
             if (this._isGroupConnected) {
-                // Firebase 리스너가 이전 데이터로 덮어쓰지 않도록 보호
-                this._recentlyDeletedAccounts.add(accountName);
-                saveSharedAccounts(this._accounts, this._accountOwners)
-                    .catch(console.error)
-                    .finally(() => this._recentlyDeletedAccounts.delete(accountName));
+                saveSharedAccounts(this._accounts, this._accountOwners).catch(console.error);
             }
         }
 
