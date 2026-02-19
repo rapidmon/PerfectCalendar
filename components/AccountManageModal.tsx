@@ -20,6 +20,7 @@ interface AccountManageModalProps {
     memberNames?: { [uid: string]: string };
     memberColors?: { [uid: string]: string };
     isGroupConnected?: boolean;
+    budgetCountByAccount?: { [accountName: string]: number };
     onClose: () => void;
     onSave: (accounts: string[], owners?: AccountOwnership) => void;
 }
@@ -31,6 +32,7 @@ export default function AccountManageModal({
     memberNames = {},
     memberColors: customColors,
     isGroupConnected = false,
+    budgetCountByAccount = {},
     onClose,
     onSave,
 }: AccountManageModalProps) {
@@ -74,12 +76,28 @@ export default function AccountManageModal({
     };
 
     const handleDelete = (key: string, name: string) => {
-        setList(prev => prev.filter(item => item.key !== key));
-        setLocalOwners(prev => {
-            const next = { ...prev };
-            delete next[name];
-            return next;
-        });
+        const count = budgetCountByAccount[name] || 0;
+        const doDelete = () => {
+            setList(prev => prev.filter(item => item.key !== key));
+            setLocalOwners(prev => {
+                const next = { ...prev };
+                delete next[name];
+                return next;
+            });
+        };
+
+        if (count > 0) {
+            Alert.alert(
+                '통장 삭제',
+                `"${name}" 통장에 연결된 가계부 내역 ${count}건이 함께 삭제됩니다.`,
+                [
+                    { text: '취소', style: 'cancel' },
+                    { text: '삭제', style: 'destructive', onPress: doDelete },
+                ],
+            );
+        } else {
+            doDelete();
+        }
     };
 
     const handleMoveUp = (index: number) => {
