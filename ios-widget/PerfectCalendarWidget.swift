@@ -350,44 +350,64 @@ struct TabBarView: View {
 
 // MARK: - Interactive Todo Card View
 
+func todoDateLabel(_ todo: TodoItem) -> String {
+    let dateStr = todo.specificDate ?? todo.deadline ?? todo.dateRangeStart ?? ""
+    guard !dateStr.isEmpty else { return "" }
+    let parts = dateStr.split(separator: "-")
+    guard parts.count >= 3,
+          let month = Int(parts[1]),
+          let day = Int(parts[2]) else { return "" }
+    return "\(month)/\(day)"
+}
+
 struct InteractiveTodoCardView: View {
     let todo: TodoItem
 
     var body: some View {
         let progress = calculateTodoProgress(todo)
+        let dateLabel = todoDateLabel(todo)
 
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text(todo.title)
-                    .font(.system(size: 13))
-                    .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
-                    .lineLimit(1)
-                Spacer()
-                Button(intent: CompleteTodoIntent(todoId: todo.id)) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color(red: 0.30, green: 0.69, blue: 0.31))
-                }
-                .buttonStyle(.plain)
-
-                Button(intent: DeleteTodoIntent(todoId: todo.id)) {
-                    Image(systemName: "trash.circle")
-                        .font(.system(size: 16))
-                        .foregroundColor(Color(red: 0.96, green: 0.26, blue: 0.21))
-                }
-                .buttonStyle(.plain)
+        HStack(alignment: .center, spacing: 8) {
+            if !dateLabel.isEmpty {
+                Text(dateLabel)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(Color(red: 0.25, green: 0.47, blue: 0.85))
+                    .frame(width: 38)
             }
 
-            if progress.hasProgress {
-                ProgressBarView(blocks: progress.blocks)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(todo.title)
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(red: 0.2, green: 0.2, blue: 0.2))
+                        .lineLimit(1)
+                    Spacer()
+                    Button(intent: CompleteTodoIntent(todoId: todo.id)) {
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color(red: 0.30, green: 0.69, blue: 0.31))
+                    }
+                    .buttonStyle(.plain)
 
-                Text(progress.daysLeft == 0
-                     ? "오늘 \(progress.label)"
-                     : "\(progress.daysLeft)일 뒤 \(progress.label)")
-                    .font(.system(size: 10))
-                    .foregroundColor(progress.daysLeft <= 3
-                        ? Color(red: 0.96, green: 0.26, blue: 0.21)
-                        : .gray)
+                    Button(intent: DeleteTodoIntent(todoId: todo.id)) {
+                        Image(systemName: "trash.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color(red: 0.96, green: 0.26, blue: 0.21))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if progress.hasProgress {
+                    ProgressBarView(blocks: progress.blocks)
+
+                    Text(progress.daysLeft == 0
+                         ? "오늘 \(progress.label)"
+                         : "\(progress.daysLeft)일 뒤 \(progress.label)")
+                        .font(.system(size: 10))
+                        .foregroundColor(progress.daysLeft <= 3
+                            ? Color(red: 0.96, green: 0.26, blue: 0.21)
+                            : .gray)
+                }
             }
         }
         .padding(.horizontal, 10)

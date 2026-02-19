@@ -26,96 +26,130 @@ function getBlockHexColor(color: BlockColor): `#${string}` {
     }
 }
 
+function getTodoDateLabel(todo: Todo): string {
+    const dateStr = todo.specificDate || todo.deadline || todo.dateRangeStart || '';
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length < 3) return '';
+    return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+}
+
 function TodoCard({ todo }: { todo: Todo }) {
     const progress = calculateTodoProgress(todo);
+    const dateLabel = getTodoDateLabel(todo);
 
     return (
         <FlexWidget
             style={{
-                flexDirection: 'column',
+                flexDirection: 'row',
                 backgroundColor: '#FFFFFF',
                 borderRadius: 12,
                 padding: 12,
                 marginBottom: 10,
                 width: 'match_parent',
+                alignItems: 'center',
             }}
         >
-            <FlexWidget
-                style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginBottom: progress.hasProgress ? 8 : 0,
-                    width: 'match_parent',
-                }}
-            >
-                <FlexWidget style={{ flex: 1 }}>
+            {/* 왼쪽: 날짜 */}
+            {dateLabel !== '' && (
+                <FlexWidget
+                    style={{
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 10,
+                        width: 40,
+                    }}
+                >
                     <TextWidget
-                        text={todo.title}
-                        maxLines={1}
-                        truncate="END"
-                        style={{ fontSize: 14, color: '#333333' }}
+                        text={dateLabel}
+                        style={{
+                            fontSize: 18,
+                            fontWeight: 'bold',
+                            color: '#4A90E2',
+                        }}
                     />
                 </FlexWidget>
-                <FlexWidget
-                    clickAction="COMPLETE_TODO"
-                    clickActionData={{ todoId: todo.id }}
-                    style={{
-                        backgroundColor: '#4CAF50',
-                        borderRadius: 6,
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        marginLeft: 6,
-                    }}
-                >
-                    <TextWidget text="완료" style={{ fontSize: 11, color: '#FFFFFF' }} />
-                </FlexWidget>
-                <FlexWidget
-                    clickAction="DELETE_TODO"
-                    clickActionData={{ todoId: todo.id }}
-                    style={{
-                        backgroundColor: '#F44336',
-                        borderRadius: 6,
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        marginLeft: 6,
-                    }}
-                >
-                    <TextWidget text="제거" style={{ fontSize: 11, color: '#FFFFFF' }} />
-                </FlexWidget>
-            </FlexWidget>
+            )}
 
-            {progress.hasProgress && (
+            {/* 오른쪽: 제목 + 버튼 + 진행바 */}
+            <FlexWidget style={{ flex: 1, flexDirection: 'column' }}>
                 <FlexWidget
                     style={{
                         flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: progress.hasProgress ? 8 : 0,
                         width: 'match_parent',
-                        marginBottom: 4,
                     }}
                 >
-                    {progress.blocks.map((block, idx) => (
-                        <FlexWidget
-                            key={idx}
-                            style={{
-                                flex: 1,
-                                height: 8,
-                                backgroundColor: getBlockHexColor(block.color),
-                                borderRadius: 2,
-                                marginRight: idx < 19 ? 1 : 0,
-                            }}
+                    <FlexWidget style={{ flex: 1 }}>
+                        <TextWidget
+                            text={todo.title}
+                            maxLines={1}
+                            truncate="END"
+                            style={{ fontSize: 14, color: '#333333' }}
                         />
-                    ))}
+                    </FlexWidget>
+                    <FlexWidget
+                        clickAction="COMPLETE_TODO"
+                        clickActionData={{ todoId: todo.id }}
+                        style={{
+                            backgroundColor: '#4CAF50',
+                            borderRadius: 6,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            marginLeft: 6,
+                        }}
+                    >
+                        <TextWidget text="완료" style={{ fontSize: 11, color: '#FFFFFF' }} />
+                    </FlexWidget>
+                    <FlexWidget
+                        clickAction="DELETE_TODO"
+                        clickActionData={{ todoId: todo.id }}
+                        style={{
+                            backgroundColor: '#F44336',
+                            borderRadius: 6,
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            marginLeft: 6,
+                        }}
+                    >
+                        <TextWidget text="제거" style={{ fontSize: 11, color: '#FFFFFF' }} />
+                    </FlexWidget>
                 </FlexWidget>
-            )}
 
-            {progress.hasProgress && (
-                <TextWidget
-                    text={progress.daysLeft === 0 ? `오늘 ${progress.label}` : `${progress.daysLeft}일 뒤 ${progress.label}`}
-                    style={{
-                        fontSize: 11,
-                        color: progress.daysLeft <= 3 ? '#F44336' : '#999999',
-                    }}
-                />
-            )}
+                {progress.hasProgress && (
+                    <FlexWidget
+                        style={{
+                            flexDirection: 'row',
+                            width: 'match_parent',
+                            marginBottom: 4,
+                        }}
+                    >
+                        {progress.blocks.map((block, idx) => (
+                            <FlexWidget
+                                key={idx}
+                                style={{
+                                    flex: 1,
+                                    height: 8,
+                                    backgroundColor: getBlockHexColor(block.color),
+                                    borderRadius: 2,
+                                    marginRight: idx < 19 ? 1 : 0,
+                                }}
+                            />
+                        ))}
+                    </FlexWidget>
+                )}
+
+                {progress.hasProgress && (
+                    <TextWidget
+                        text={progress.daysLeft === 0 ? `오늘 ${progress.label}` : `${progress.daysLeft}일 뒤 ${progress.label}`}
+                        style={{
+                            fontSize: 11,
+                            color: progress.daysLeft <= 3 ? '#F44336' : '#999999',
+                        }}
+                    />
+                )}
+            </FlexWidget>
         </FlexWidget>
     );
 }
