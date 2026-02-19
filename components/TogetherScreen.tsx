@@ -39,7 +39,7 @@ type ScreenMode = 'loading' | 'not_connected' | 'connected';
 export default function TogetherScreen() {
   const { store } = useStore();
   const { todos } = useTodos();
-  const { budgets, categories, fixedCategories } = useBudgets();
+  const { budgets, categories, fixedCategories, savingsCategories } = useBudgets();
   const { accounts } = useAccounts();
   const { memberColors } = useGroup();
   const [mode, setMode] = useState<ScreenMode>('loading');
@@ -208,7 +208,11 @@ export default function TogetherScreen() {
             ...(existingShared?.fixedCategories || []),
             ...fixedCategories,
           ])];
-          await uploadLocalCategories(mergedCategories, mergedFixed);
+          const mergedSavings = [...new Set([
+            ...(existingShared?.savingsCategories || []),
+            ...savingsCategories,
+          ])];
+          await uploadLocalCategories(mergedCategories, mergedFixed, mergedSavings);
         }
 
         // 참여 시 로컬 통장을 원격과 병합 후 업로드

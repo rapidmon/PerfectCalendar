@@ -19,7 +19,7 @@ interface BudgetFullListProps {
 
 export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     const { store } = useStore();
-    const { budgets, categories, fixedCategories, monthlyGoals } = useBudgets();
+    const { budgets, categories, fixedCategories, savingsCategories, monthlyGoals } = useBudgets();
     const { accounts, accountOwners } = useAccounts();
     const { memberNames, memberColors, isGroupConnected } = useGroup();
 
@@ -91,6 +91,10 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
         store.setMonthlyGoal(monthKey, amount);
     }, [store, monthKey]);
 
+    const handleSaveSavingsCategories = useCallback((savingsCats: string[]) => {
+        store.saveSavingsCategories(savingsCats);
+    }, [store]);
+
     const handleDeleteGoal = useCallback(() => {
         store.deleteMonthlyGoal(monthKey);
     }, [store, monthKey]);
@@ -118,8 +122,8 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
     }, []);
 
     const stats = useMemo(
-        () => computeMonthlyStats(budgets, viewYear, viewMonth, fixedCategories),
-        [budgets, viewYear, viewMonth, fixedCategories]
+        () => computeMonthlyStats(budgets, viewYear, viewMonth, fixedCategories, savingsCategories),
+        [budgets, viewYear, viewMonth, fixedCategories, savingsCategories]
     );
 
     const chartData = useMemo(
@@ -182,8 +186,12 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 visible={goalModalVisible}
                 currentGoal={monthlyGoals[monthKey]}
                 monthLabel={monthLabel}
+                categories={categories}
+                fixedCategories={fixedCategories}
+                savingsCategories={savingsCategories}
                 onClose={() => setGoalModalVisible(false)}
                 onSave={handleSaveGoal}
+                onSaveSavingsCategories={handleSaveSavingsCategories}
                 onDelete={handleDeleteGoal}
             />
 
@@ -202,6 +210,10 @@ export default function BudgetFullList({ selectedDate }: BudgetFullListProps) {
                 memberNames={memberNames}
                 memberColors={memberColors}
                 isGroupConnected={isGroupConnected}
+                budgetCountByAccount={budgets.reduce((acc, b) => {
+                    if (b.account) acc[b.account] = (acc[b.account] || 0) + 1;
+                    return acc;
+                }, {} as { [key: string]: number })}
                 onClose={() => setAccountManageModalVisible(false)}
                 onSave={handleSaveAccounts}
             />

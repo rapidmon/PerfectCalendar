@@ -14,6 +14,7 @@ import {
     loadInvestments, saveInvestments,
     loadSavings, saveSavings,
     loadFixedExpenses, saveFixedExpenses as saveFixedExpensesToStorage,
+    loadSavingsCategories, saveSavingsCategories,
 } from '../utils/storage';
 import { getMissingSavingsPayments } from '../utils/savingsCalculator';
 import {
@@ -85,6 +86,7 @@ export class AppDataStore {
     private _categories: string[] = [];
     private _accounts: string[] = [];
     private _fixedCategories: string[] = [];
+    private _savingsCategories: string[] = [];
     private _monthlyGoals: MonthlyGoal = {};
     private _accountOwners: AccountOwnership = {};  // 통장 소유자 정보
     private _investments: Investment[] = [];
@@ -118,6 +120,7 @@ export class AppDataStore {
     get categories(): string[] { return this._categories; }
     get accounts(): string[] { return this._accounts; }
     get fixedCategories(): string[] { return this._fixedCategories; }
+    get savingsCategories(): string[] { return this._savingsCategories; }
     get monthlyGoals(): MonthlyGoal { return this._monthlyGoals; }
     get accountOwners(): AccountOwnership { return this._accountOwners; }
     get investments(): Investment[] { return this._investments; }
@@ -152,12 +155,13 @@ export class AppDataStore {
 
     // ── Initial Data Load ──────────────────────────────────────
     async loadAll(): Promise<void> {
-        const [todos, budgets, categories, fixedCategories, monthlyGoals, accounts, investments, savings, fixedExpenseSchedules] =
+        const [todos, budgets, categories, fixedCategories, savingsCats, monthlyGoals, accounts, investments, savings, fixedExpenseSchedules] =
             await Promise.all([
                 loadTodos(),
                 loadBudgets(),
                 loadCategories(),
                 loadFixedExpenseCategories(),
+                loadSavingsCategories(),
                 loadMonthlyGoals(),
                 loadAccounts(),
                 loadInvestments(),
@@ -169,6 +173,7 @@ export class AppDataStore {
         this._budgets = budgets;
         this._categories = categories;
         this._fixedCategories = fixedCategories;
+        this._savingsCategories = savingsCats;
         this._monthlyGoals = monthlyGoals;
         this._accounts = accounts;
         this._investments = investments;
@@ -301,6 +306,7 @@ export class AppDataStore {
                     (shared: SharedCategories) => {
                         this._categories = shared.categories || [];
                         this._fixedCategories = shared.fixedCategories || [];
+                        this._savingsCategories = shared.savingsCategories || [];
                         this.notify();
                     },
                     (error) => console.error('Category sync error:', error)
@@ -658,7 +664,8 @@ export class AppDataStore {
             getSharedCategories().then(shared => {
                 const mergedCats = [...new Set([...(shared?.categories || []), ...this._categories])];
                 const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...this._fixedCategories])];
-                saveSharedCategories(mergedCats, mergedFixed).catch(console.error);
+                const mergedSavings = [...new Set([...(shared?.savingsCategories || []), ...this._savingsCategories])];
+                saveSharedCategories(mergedCats, mergedFixed, mergedSavings).catch(console.error);
             }).catch(console.error);
         }
     }
@@ -666,15 +673,33 @@ export class AppDataStore {
     saveCategoriesAndFixed(cats: string[], fixed: string[]): void {
         this._categories = cats;
         this._fixedCategories = fixed;
+        // 삭제된 카테고리를 savingsCategories에서도 제거
+        this._savingsCategories = this._savingsCategories.filter(c => cats.includes(c));
         this.notify();
         this.debouncedSave('categories', () => saveCategories(this._categories));
         this.debouncedSave('fixedCategories', () => saveFixedExpenseCategories(this._fixedCategories));
+        this.debouncedSave('savingsCategories', () => saveSavingsCategories(this._savingsCategories));
 
         if (this._isGroupConnected) {
             getSharedCategories().then(shared => {
                 const mergedCats = [...new Set([...(shared?.categories || []), ...cats])];
                 const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...fixed])];
-                saveSharedCategories(mergedCats, mergedFixed).catch(console.error);
+                const mergedSavings = [...new Set([...(shared?.savingsCategories || []), ...this._savingsCategories])];
+                saveSharedCategories(mergedCats, mergedFixed, mergedSavings).catch(console.error);
+            }).catch(console.error);
+        }
+    }
+
+    saveSavingsCategories(savingsCats: string[]): void {
+        this._savingsCategories = savingsCats;
+        this.notify();
+        this.debouncedSave('savingsCategories', () => saveSavingsCategories(this._savingsCategories));
+
+        if (this._isGroupConnected) {
+            getSharedCategories().then(shared => {
+                const mergedCats = [...new Set([...(shared?.categories || []), ...this._categories])];
+                const mergedFixed = [...new Set([...(shared?.fixedCategories || []), ...this._fixedCategories])];
+                saveSharedCategories(mergedCats, mergedFixed, savingsCats).catch(console.error);
             }).catch(console.error);
         }
     }
@@ -718,6 +743,18 @@ export class AppDataStore {
                     this._budgets = this._budgets.filter(b => !b.savingsId || !idsToDelete.has(b.savingsId));
                     this.debouncedSave('budgets', () => saveBudgets(this._budgets));
                 }
+            }
+
+            // 삭제된 통장을 참조하는 가계부 항목도 함께 삭제
+            const removedSet = new Set(removedAccounts);
+            const orphanedBudgets = this._budgets.filter(b => b.account && removedSet.has(b.account));
+            if (orphanedBudgets.length > 0) {
+                if (this._isGroupConnected) {
+                    const orphanedIds = orphanedBudgets.map(b => b.id);
+                    deleteSharedBudgetsBatch(orphanedIds).catch(console.error);
+                }
+                this._budgets = this._budgets.filter(b => !b.account || !removedSet.has(b.account));
+                this.debouncedSave('budgets', () => saveBudgets(this._budgets));
             }
         }
 

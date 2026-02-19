@@ -5,6 +5,7 @@ export interface MonthlyStats {
     totalExpense: number;
     totalSavings: number;
     totalFixedExpense: number;
+    totalSavingsExpense: number;
     incomeExpenseRatio: number;
     categoryBreakdown: { category: string; amount: number; ratio: number }[];
 }
@@ -30,6 +31,7 @@ export function computeMonthlyStats(
     year: number,
     month: number,
     fixedCategories: string[],
+    savingsCategories: string[] = [],
 ): MonthlyStats {
     const monthBudgets = getBudgetsForMonth(budgets, year, month);
 
@@ -37,6 +39,7 @@ export function computeMonthlyStats(
     let totalExpense = 0;
     let totalSavings = 0;
     let totalFixedExpense = 0;
+    let totalSavingsExpense = 0;
     const categoryMap: Record<string, number> = {};
 
     for (const b of monthBudgets) {
@@ -53,6 +56,8 @@ export function computeMonthlyStats(
 
             if (fixedCategories.includes(b.category)) {
                 totalFixedExpense += abs;
+            } else if (savingsCategories.includes(b.category)) {
+                totalSavingsExpense += abs;
             }
 
             categoryMap[b.category] = (categoryMap[b.category] || 0) + abs;
@@ -75,6 +80,7 @@ export function computeMonthlyStats(
         totalExpense,
         totalSavings,
         totalFixedExpense,
+        totalSavingsExpense,
         incomeExpenseRatio,
         categoryBreakdown,
     };

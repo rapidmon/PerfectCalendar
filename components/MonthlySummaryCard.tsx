@@ -45,7 +45,7 @@ function MonthlySummaryCard({
     const formatAmount = (n: number) => n.toLocaleString('ko-KR') + '원';
     const formatRatio = (n: number) => n.toFixed(1) + '%';
 
-    const goalDiff = goalAmount ? goalAmount - (stats.totalExpense - stats.totalFixedExpense) : undefined;
+    const goalDiff = goalAmount ? goalAmount - (stats.totalExpense - stats.totalFixedExpense - stats.totalSavingsExpense) : undefined;
     const isOverBudget = goalDiff !== undefined && goalDiff < 0;
 
     const formatGrowth = (value: number | null) => {

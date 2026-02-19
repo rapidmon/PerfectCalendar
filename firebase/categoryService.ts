@@ -11,13 +11,15 @@ import { getCurrentGroupCode } from './groupService';
 export interface SharedCategories {
   categories: string[];
   fixedCategories: string[];
+  savingsCategories?: string[];
   updatedAt: number;
 }
 
 // 카테고리 정보 저장
 export async function saveSharedCategories(
   categories: string[],
-  fixedCategories: string[]
+  fixedCategories: string[],
+  savingsCategories: string[] = []
 ): Promise<boolean> {
   const groupCode = await getCurrentGroupCode();
 
@@ -30,6 +32,7 @@ export async function saveSharedCategories(
   await setDoc(docRef, {
     categories,
     fixedCategories,
+    savingsCategories,
     updatedAt: Date.now()
   });
 
@@ -73,7 +76,7 @@ export async function subscribeToSharedCategoriesAsync(
       if (snapshot.exists()) {
         onUpdate(snapshot.data() as SharedCategories);
       } else {
-        onUpdate({ categories: [], fixedCategories: [], updatedAt: 0 });
+        onUpdate({ categories: [], fixedCategories: [], savingsCategories: [], updatedAt: 0 });
       }
     },
     (error) => {
@@ -89,7 +92,8 @@ export async function subscribeToSharedCategoriesAsync(
 // 기존 로컬 카테고리 데이터 업로드
 export async function uploadLocalCategories(
   categories: string[],
-  fixedCategories: string[]
+  fixedCategories: string[],
+  savingsCategories: string[] = []
 ): Promise<boolean> {
-  return await saveSharedCategories(categories, fixedCategories);
+  return await saveSharedCategories(categories, fixedCategories, savingsCategories);
 }

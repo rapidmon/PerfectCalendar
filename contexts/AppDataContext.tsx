@@ -21,6 +21,7 @@ interface BudgetData {
     budgets: Budget[];
     categories: string[];
     fixedCategories: string[];
+    savingsCategories: string[];
     monthlyGoals: MonthlyGoal;
 }
 
@@ -89,9 +90,10 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
             budgets: store.budgets,
             categories: store.categories,
             fixedCategories: store.fixedCategories,
+            savingsCategories: store.savingsCategories,
             monthlyGoals: store.monthlyGoals,
         }),
-        [store.budgets, store.categories, store.fixedCategories, store.monthlyGoals]
+        [store.budgets, store.categories, store.fixedCategories, store.savingsCategories, store.monthlyGoals]
     );
 
     const accountValue = useMemo<AccountData>(

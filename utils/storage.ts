@@ -23,6 +23,7 @@ const TODOS_KEY = '@todos';
 const BUDGETS_KEY = '@budgets';
 const BUDGET_CATEGORIES_KEY = '@budget_categories';
 const FIXED_EXPENSE_CATEGORIES_KEY = '@fixed_expense_categories';
+const SAVINGS_CATEGORIES_KEY = '@savings_categories';
 const MONTHLY_GOALS_KEY = '@monthly_goals';
 const ACCOUNTS_KEY = '@accounts';
 const ONBOARDING_COMPLETE_KEY = '@onboarding_complete';
@@ -136,6 +137,30 @@ export const loadFixedExpenseCategories = async (): Promise<string[]> => {
         return [];
     } catch (e) {
         console.error('고정지출 카테고리 불러오기 실패:', e);
+        return [];
+    }
+};
+
+// 목표제외 카테고리 저장
+export const saveSavingsCategories = async (categories: string[]): Promise<void> => {
+    try {
+        const jsonValue = JSON.stringify(categories);
+        await AsyncStorage.setItem(SAVINGS_CATEGORIES_KEY, jsonValue);
+    } catch (e) {
+        console.error('목표제외 카테고리 저장 실패:', e);
+    }
+};
+
+// 목표제외 카테고리 불러오기
+export const loadSavingsCategories = async (): Promise<string[]> => {
+    try {
+        const jsonValue = await AsyncStorage.getItem(SAVINGS_CATEGORIES_KEY);
+        if (jsonValue != null) {
+            return JSON.parse(jsonValue);
+        }
+        return [];
+    } catch (e) {
+        console.error('목표제외 카테고리 불러오기 실패:', e);
         return [];
     }
 };
